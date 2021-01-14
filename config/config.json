@@ -1,0 +1,73 @@
+{
+	"__default__": {
+		"cluster" : "qsub -V -l",
+			"time"      : "04:00:00",
+			"ncpus"         : 20,
+			"mem"       : "32G",
+			"output"    : "./logs",
+			"error"     : "./logs"
+	},
+	"SoupOrCell": {
+		"cluster" : "qsub -V -l",
+			"time"      : "18:00:00",
+			"ncpus"         : 10,
+			"mem"       : "32G",
+			"jobname"       : "SoupOrCell"
+	},
+	"Vireo": {
+		"cluster" : "qsub -V -l",
+			"time"      : "18:00:00",
+			"ncpus"         : 10,
+			"mem"       : "32G",
+			"jobname"       : "Vireo"
+	},
+	"DEMULTIPLEXINGREPORT": {
+		"cluster" : "qsub -V -l",
+			"time"      : "18:00:00",
+			"ncpus"         : 1,
+			"mem"       : "8G",
+			"jobname"       : "DEMULTIPLEXINGREPORT"
+	},
+	"DEMULTIPLEXINGAGGREGATION": {
+		"cluster" : "qsub -V -l",
+			"time"      : "18:00:00",
+			"ncpus"         : 1,
+			"mem"       : "4G",
+			"jobname"       : "DEMULTIPLEXINGAGGREGATION"
+	},
+	"DEMUXLET_v1": {
+		"cluster" : "qsub -V -l",
+			"time"      : "18:00:00",
+			"ncpus"         : 1,
+			"mem"       : "32G",
+			"jobname"       : "DEMUXLET_v1"
+	},
+	"SCANSNPMATRIXGEN":{
+		"cluster" : "qsub -V -l",
+			"time"      : "24:00:00",
+			"ncpus"         : 10,
+			"mem"       : "48G",
+			"jobname"       : "SCANSNPMATRIXGEN"
+	},
+	"SCANSNPDECONVOLUTION":{
+		"cluster" : "qsub -V -l",
+			"time"      : "24:00:00",
+			"ncpus"         : 1,
+			"mem"       : "48G",
+			"jobname"       : "SCANSNPDECONVOLUTION"
+	},
+	"SCANSNPDBLsMARK":{
+		"cluster" : "qsub -V -l",
+			"time"      : "01:00:00",
+			"ncpus"         : 1,
+			"mem"       : "8G",
+			"jobname"       : "SCANSNPDBLsMARK"
+	},
+	"DEMUXLET_v2": {
+		"cluster" : "qsub -V -l",
+			"time"      : "18:00:00",
+			"ncpus"         : 1,
+			"mem"       : "32G",
+			"jobname"       : "DEMUXLET_v2"
+	}
+}

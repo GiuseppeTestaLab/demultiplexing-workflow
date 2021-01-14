@@ -1,0 +1,381 @@
+
+import errno
+import os
+import yaml
+
+
+###################Tunable params########################
+#########################################################
+report: "./REPORT_SNAKEMAKE.rst"
+configfile: "/hpcnfs/data/GT/snakemakepipelines/config.json"
+inputfile='./samples.yaml'
+
+REFERENCEFASTA="/hpcnfs/scratch/GT/References/Ensembl/Assembly/Homo_sapiens.GRCh38.v93.dna.primary_assembly.fa"
+IMAGEPATH="/hpcnfs/data/GT/singularityImages/organoidMultiplexing_Final.sif"
+SOCIMAGEPATH="/hpcnfs/data/GT/singularityImages/souporcell_Final.sif"
+
+###################END of params#########################
+#########################################################
+WD=os.getcwd()+'/'
+
+
+
+
+NAMES = []
+BAMPATH={}
+VCFPATH={}
+K={}
+FIELD={}
+FILTEREDBARCODE={}
+
+
+with open(inputfile) as f:
+	inputdata = yaml.full_load(f)
+
+NAMES=inputdata['MultiplexedExperiments'].keys()
+
+
+
+rule all:
+	input:
+		#expand( WD + '{sample}/Demuxlet_V1/{sample}.best', sample = NAMES),
+		#expand(WD + '{sample}/Demuxlet_V2/{sample}.best', sample = NAMES),
+		#expand( WD + '{sample}/SoupOrCell/clusters.tsv', sample = NAMES),
+		#expand(WD + '{sample}/Vireo/vireoOut/donor_ids.tsv', sample = NAMES),
+		#expand( WD + '{sample}/Demultiplexing.report.html',sample = NAMES),
+		WD + 'AggregatedReport/AggregatedReport.html'
+
+
+
+
+
+
+
+
+######################################################## Demuxlet V1 ######################################
+##################################################################################################################
+rule DEMUXLET_v1:
+	input:
+		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
+		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
+		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
+	output:
+		Demuxlet_V1 =  WD + '{sample}/Demuxlet_V1/{sample}.best',
+	params:
+		ext= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes'].split('.')[-1],
+		field= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['field']
+	singularity:
+		IMAGEPATH
+	log:"logs/DEMUXLET_v1.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+		mkdir -p {WD}{wildcards.sample}/Demuxlet_V1
+		cd {WD}{wildcards.sample}/Demuxlet_V1
+
+		if [ {params.ext} = "tsv" ]; then
+		nCells=`cat {input.barcodeFile} | wc -l`
+		dblPrior=$(bc <<< "scale=3;$nCells/130000")
+		echo $dblPrior > {WD}{wildcards.sample}/Demuxlet_V1/dblPrior.txt
+		demuxlet --sam {input.bampath} \
+		--vcf {input.vcfpath} \
+		--field {params.field} \
+		--out {WD}{wildcards.sample}/Demuxlet_V1/{wildcards.sample} \
+		--group-list <( cat {input.barcodeFile}) \
+		--doublet-prior $dblPrior
+		elif [ {params.ext} = "gz" ]; then
+		nCells=`zcat {input.barcodeFile} | wc -l`
+		dblPrior=$(bc <<< "scale=3;$nCells/130000")
+		echo $dblPrior > {WD}{wildcards.sample}/Demuxlet_V1/dblPrior.txt
+		demuxlet --sam {input.bampath} \
+		--vcf {input.vcfpath} \
+		--field {params.field} \
+		--out {WD}{wildcards.sample}/Demuxlet_V1/{wildcards.sample} \
+		--group-list <( zcat {input.barcodeFile}) \
+		--doublet-prior $dblPrior
+		fi
+		"""
+
+
+
+######################################################## Demuxlet V2  ######################################
+##################################################################################################################
+rule DEMUXLET_v2:
+	input:
+		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
+		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
+		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
+	output:
+		Demuxlet_V2 =  WD + '{sample}/Demuxlet_V2/{sample}.best',
+	params:
+		ext= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes'].split('.')[-1],
+		field= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['field']
+	singularity:
+		IMAGEPATH
+	log:"logs/DEMUXLET_v2.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+		mkdir -p {WD}{wildcards.sample}/Demuxlet_V2
+		cd {WD}{wildcards.sample}/Demuxlet_V2
+
+		cd {WD}{wildcards.sample}
+		if [ {params.ext} = "gz" ]; then
+		zcat {input.barcodeFile} > {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv
+		elif [ {params.ext} = "tsv" ]; then
+		cp {input.barcodeFile} {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv
+		fi
+		nCells=`cat {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv | wc -l`
+		dblPrior=$(bc <<< "scale=3;$nCells/130000")
+		echo $dblPrior > {WD}{wildcards.sample}/Demuxlet_V2/dblPrior.txt
+		popscle demuxlet \
+		--sam {input.bampath} \
+		--vcf {input.vcfpath} \
+		--out {WD}{wildcards.sample}/Demuxlet_V2/{wildcards.sample} \
+		--field {params.field} \
+		--group-list {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv \
+		--doublet-prior $dblPrior
+		"""
+
+
+
+
+####################################################### SoupOrCell  ######################################
+#################################################################################################################
+rule SoupOrCell:
+	input:
+		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
+		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
+		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
+	output:
+		SoC =  WD + '{sample}/SoupOrCell/clusters.tsv',
+	params:
+		ext= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes'].split('.')[-1],
+		k= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['mixedGenotypes'],
+		ncpus = config['SoupOrCell']['ncpus']
+	singularity:
+		SOCIMAGEPATH
+	log:"logs/SoupOrCell.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+		mkdir -p {WD}{wildcards.sample}
+		cd {WD}{wildcards.sample}
+
+
+		if [ {params.ext} = "tsv" ]; then
+		gzip -c {input.barcodeFile} > {WD}{wildcards.sample}/zippedBC_SoC.gz
+		souporcell_pipeline.py \
+		-i {input.bampath} \
+		-b {WD}{wildcards.sample}/zippedBC_SoC.gz \
+		-f {REFERENCEFASTA} \
+		-t {params.ncpus} \
+		-o {WD}{wildcards.sample}/SoupOrCell \
+		-k {params.k} && rm {WD}{wildcards.sample}/zippedBC_SoC.gz
+		elif [ {params.ext} = "gz" ]; then
+		souporcell_pipeline.py \
+		-i {input.bampath} \
+		-b {input.barcodeFile} \
+		-f {REFERENCEFASTA} \
+		-t {params.ncpus} \
+		-o {WD}{wildcards.sample}/SoupOrCell \
+		-k {params.k}
+		fi
+		"""
+
+
+######################################################## Vireo  ######################################
+##################################################################################################################
+rule Vireo:
+	input:
+		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
+		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
+		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
+	output:
+		Vireo = WD + '{sample}/Vireo/vireoOut/donor_ids.tsv',
+	params:
+		ext= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes'].split('.')[-1],
+		ncpus = config['Vireo']['ncpus'],
+		genotag = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['field']
+	singularity:
+		IMAGEPATH
+	log:"logs/Vireo.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+		mkdir -p {WD}{wildcards.sample}/Vireo/cellSNPout
+		mkdir -p {WD}{wildcards.sample}/Vireo/vireoOut
+		cd {WD}{wildcards.sample}/Vireo
+
+		if [ {params.ext} = "gz" ]; then
+		zcat {input.barcodeFile} > {WD}{wildcards.sample}/Vireo/unzippedBC_Vire.tsv
+		cellSNP -s {input.bampath} \
+		-b {WD}{wildcards.sample}/Vireo/unzippedBC_Vire.tsv \
+		-O {WD}{wildcards.sample}/Vireo/cellSNPout \
+		-R {input.vcfpath} \
+		-p {params.ncpus} \
+		--minMAF 0.1 \
+		--minCOUNT 20
+		elif [ {params.ext} = "tsv" ]; then
+		cellSNP -s {input.bampath} \
+		-b {input.barcodeFile} \
+		-O {WD}{wildcards.sample}/Vireo/cellSNPout \
+		-R {input.vcfpath} \
+		-p {params.ncpus} \
+		--minMAF 0.1 \
+		--minCOUNT 20
+		fi
+
+		vireo  -c {WD}{wildcards.sample}/Vireo/cellSNPout \
+		-d <(grep -v '\.\/\.' {input.vcfpath}) \
+		--genoTag {params.genotag} \
+		-o {WD}{wildcards.sample}/Vireo/vireoOut
+		"""
+
+
+#########################################################--Fire up SCanSNP MTRIXGEN MODE--######################################
+##################################################################################################################
+rule SCANSNPMATRIXGEN:
+	input:
+		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
+		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
+		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
+	output:
+		counts = WD + '{sample}/SCanSNP/Counts.npz'
+	params:
+		nthreads = config['SCANSNPMATRIXGEN']['ncpus']
+	singularity:
+		IMAGEPATH
+	log:"logs/SCANSNPMATRIXGEN.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+		mkdir -p {WD}{wildcards.sample}/SCanSNP
+		cd {WD}{wildcards.sample}/SCanSNP
+
+		python3 /softwares/SCanSNP/SCanSNP.py \
+		--threads {params.nthreads} \
+		--mode matrixgen \
+		--BAM {input.bampath} \
+		--barcodes {input.barcodeFile} \
+		--vcf {input.vcfpath} \
+		--outdir {WD}{wildcards.sample}/SCanSNP
+		"""
+
+
+
+#########################################################--Fire up SCanSNP DECONVOLUTION MODE--######################################
+##################################################################################################################
+
+rule SCANSNPDECONVOLUTION:
+	input:
+		countMatrices = WD + '{sample}/SCanSNP/Counts.npz',
+		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
+		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
+	output:
+		WD + '{sample}/SCanSNP/Barcode-ID.tsv',
+		WD + '{sample}/SCanSNP/DBLmetricsDF.tsv'
+	params:
+		nthreads = config['SCANSNPDECONVOLUTION']['ncpus']
+	singularity:
+		IMAGEPATH
+	log:"logs/SCANSNPDECONVOLUTION.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+		mkdir -p {WD}{wildcards.sample}/SCanSNP
+		cd {WD}{wildcards.sample}/SCanSNP
+
+		python3 /softwares/SCanSNP/SCanSNP.py \
+		--mode deconvolution \
+		--counts {WD}{wildcards.sample}/SCanSNP \
+		--vcf {input.vcfpath} \
+		--outdir {WD}{wildcards.sample}/SCanSNP
+		"""
+
+# #########################################################--DBL-SNG NEGBIN model fitting--######################################
+# ##################################################################################################################
+
+rule SCANSNPDBLsMARK:
+	input:
+		DBLmetricsDF = WD + '{sample}/SCanSNP/DBLmetricsDF.tsv'
+	output:
+		WD + '{sample}/SCanSNP/doubletsMarked.tsv'
+	singularity:
+		IMAGEPATH
+	log:"logs/MIXTUREFITTING.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+		mkdir -p {WD}{wildcards.sample}/SCanSNP
+		cd {WD}{wildcards.sample}/SCanSNP
+
+		Rscript /softwares/SCanSNP/dblsMark.r \
+		{input.DBLmetricsDF} {WD}{wildcards.sample}/SCanSNP
+		"""
+
+# #########################################################--DEMULTIPLEXINGREPORT--######################################
+# ##################################################################################################################
+
+
+rule DEMULTIPLEXINGREPORT:
+	input:
+		Demuxlet_V1 =  WD + '{sample}/Demuxlet_V1/{sample}.best',
+		Demuxlet_V2 = WD + '{sample}/Demuxlet_V2/{sample}.best',
+		SoC =  WD + '{sample}/SoupOrCell/clusters.tsv',
+		Vireo = WD + '{sample}/Vireo/vireoOut/donor_ids.tsv',
+		SCanSNP = WD + '{sample}/SCanSNP/doubletsMarked.tsv'
+	output:
+		htmlOut =  WD + '{sample}/Demultiplexing.report.html',
+		metricesOut =  WD + '{sample}/ReportFiles/{sample}.report.tsv',
+	params:
+		BarcodeMap = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['barcodesMap'],
+		FilteredFeaturesPath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['FilteredFeaturesPath']
+	singularity:
+		IMAGEPATH
+	log:"logs/DEMULTIPLEXINGREPORT.{sample}.log"
+	shell:
+		"""
+		exec 2>{log}
+
+		mkdir -p {WD}{wildcards.sample}/ReportFiles
+
+Rscript -e "knitr::knit_meta(class=NULL, clean = TRUE); \
+Sys.setenv("MC_CORES"=3L); \
+rmarkdown::render('/scripts/Demultiplexing_report.Rmd' , \
+intermediates_dir = '{WD}{wildcards.sample}/', \
+output_file = '{output.htmlOut}', \
+output_dir = '{WD}{wildcards.sample}/', \
+params = list( Dataset = '{wildcards.sample}' , FilteredFeaturesPath =  '{params.FilteredFeaturesPath}' , Demuxlet_V1 = '{input.Demuxlet_V1}', Demuxlet_V2 = '{input.Demuxlet_V2}', SoC = '{input.SoC}', Vireo = '{input.Vireo}' , SCanSNP = '{input.SCanSNP}', BarcodeMap = '{params.BarcodeMap}', outFile = '{output.metricesOut}' ))"
+		"""
+
+
+
+rule DEMULTIPLEXINGAGGREGATION:
+	input:
+		MetricesList = expand(WD + '{sample}/ReportFiles/{sample}.report.tsv', sample = NAMES)
+	output:
+		htmlOut = WD + 'AggregatedReport/AggregatedReport.html'
+	params:
+		NamesList = list(NAMES)
+	singularity:
+		IMAGEPATH
+	log:"logs/DEMULTIPLEXINGAGGREGATION.log"
+	shell:
+		"""
+		exec 2>{log}
+
+		mkdir -p {WD}/ReportFiles
+
+		DMXmetrices=`echo {input.MetricesList} | sed 's/ /,/g'`
+		DSnames=`echo {params.NamesList} | sed 's/ /,/g'`
+
+
+Rscript -e "knitr::knit_meta(class=NULL, clean = TRUE); \
+Sys.setenv("MC_CORES"=3L); \
+rmarkdown::render('/scripts/Demultiplexing_aggregation.Rmd' , \
+intermediates_dir = '{WD}/AggregatedReport', \
+output_file = '{output.htmlOut}', \
+output_dir = '{WD}/AggregatedReport', \
+params = list( DSnames = '${{DSnames}}' , DMXmetrices =  '${{DMXmetrices}}'  ))"
+		"""

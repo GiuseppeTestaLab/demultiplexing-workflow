@@ -1,0 +1,81 @@
+MultiplexedExperiments:
+  SYNTH1:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH1/Synth_Balanced_doublets/SilicoMultiplexed.dblAdded.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH1/Synth_Balanced_doublets/Barcodes.new.tsv"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/0.1_Synth_creation_Dav_temp/Dav/1_Subsampling/CombineVCF/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "5"
+    barcodesMap: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH1/Synth_Balanced_doublets/doubletsMap.tsv"
+    FilteredFeaturesPath: NULL
+  SYNTH2:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH2/Synth_Balanced_doublets/SilicoMultiplexed.dblAdded.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH2/Synth_Balanced_doublets/Barcodes.new.tsv"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/0.1_Synth_creation_Dav_temp/Dav/1_Subsampling/CombineVCF/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "5"
+    barcodesMap: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH2/Synth_Balanced_doublets/doubletsMap.tsv"
+    FilteredFeaturesPath: NULL
+  SYNTH3:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH3/Synth_Balanced_doublets/SilicoMultiplexed.dblAdded.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH3/Synth_Balanced_doublets/Barcodes.new.tsv"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/0.1_Synth_creation_Dav_temp/Dav/1_Subsampling/CombineVCF/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "5"
+    barcodesMap: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH3/Synth_Balanced_doublets/doubletsMap.tsv"
+    FilteredFeaturesPath: NULL
+  SYNTH4:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH4/Synth_Balanced_doublets/SilicoMultiplexed.dblAdded.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH4/Synth_Balanced_doublets/Barcodes.new.tsv"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/0.1_Synth_creation_Dav_temp/Dav/1_Subsampling/CombineVCF/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "5"
+    barcodesMap: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH4/Synth_Balanced_doublets/doubletsMap.tsv"
+    FilteredFeaturesPath: NULL
+  SYNTH5:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH5/Synth_Balanced_doublets/SilicoMultiplexed.dblAdded.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH5/Synth_Balanced_doublets/Barcodes.new.tsv"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/0.1_Synth_creation_Dav_temp/Dav/1_Subsampling/CombineVCF/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "5"
+    barcodesMap: "/hpcnfs/scratch/temporary/Dav_vc/0.2_SynthII_creation/SYNTH5/Synth_Balanced_doublets/doubletsMap.tsv"
+    FilteredFeaturesPath: NULL
+  Sample_S20272_157:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20272_157/outs/possorted_genome_bam.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20272_157/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/2_Combining/Sample_S20273_157/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "4"
+    barcodesMap: NULL
+    FilteredFeaturesPath: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20272_157/outs/filtered_feature_bc_matrix/"
+  Sample_S20273_158:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20273_158/outs/possorted_genome_bam.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20273_158/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/2_Combining/Sample_S20273_158/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "6"
+    barcodesMap: NULL
+    FilteredFeaturesPath: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20273_158/outs/filtered_feature_bc_matrix/"
+  Sample_S20812_258:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20812_258/outs/possorted_genome_bam.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20812_258/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/2_Combining/Sample_S20812_258_D100UP/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "4"
+    barcodesMap: NULL
+    FilteredFeaturesPath: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20812_258/outs/filtered_feature_bc_matrix/"
+  Sample_S20813_259:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20813_259/outs/possorted_genome_bam.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20813_259/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/2_Combining/Sample_S20813_259_D100UP_A1546/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "4"
+    barcodesMap: NULL
+    FilteredFeaturesPath: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20813_259/outs/filtered_feature_bc_matrix/"
+  Sample_S20814_260:
+    BAM: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20814_260/outs/possorted_genome_bam.bam"
+    goodBarcodes: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20814_260/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+    VCF: "/hpcnfs/scratch/temporary/Dav_vc/2_Combining/Sample_S20814_260_D250DOWN/output/combinedVCF/jointGenotype.g.vcf"
+    field: "PL"
+    mixedGenotypes: "6"
+    barcodesMap: NULL
+    FilteredFeaturesPath: "/hpcnfs/scratch/temporary/Dav_vc/0_CellrangerAlign/Sample_S20814_260/outs/filtered_feature_bc_matrix/"

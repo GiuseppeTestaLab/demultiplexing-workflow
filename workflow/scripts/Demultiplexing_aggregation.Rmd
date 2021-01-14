@@ -1,0 +1,265 @@
+---
+title: "Multiplexing Software Benchmark"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    theme: 'yeti'
+    highlight: 'tango'
+    code_folding: hide
+params:
+  DSnames: NULL
+  DMXmetrices: NULL
+---
+
+
+Parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+
+
+## __1. SetUp__
+
+
+```{r, message = FALSE, collapse=TRUE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+
+options(stringsAsFactors = FALSE)
+```
+
+
+
+## __2. Non Synthetic bam aggregation data__
+
+
+```{r ReadData,, collapse=TRUE}
+
+#Storing metrices in DF list
+
+
+DSlist <- unlist(strsplit(params$DMXmetrices,","))
+DSNamesList <- unlist(strsplit(params$DSnames,","))
+
+loadedList <- list()
+for (DS in seq(1, length(DSlist))){
+  DSName <- DSNamesList[DS]
+  LoadedDS <- read.csv(DSlist[DS],  header = T, sep = "\t",stringsAsFactors=F)
+  if (LoadedDS$DStype[1] == "1") {
+    loadedList[[DSName]] <- LoadedDS
+  }
+}
+
+#Aggregate DF and select only non-synthetics
+AggregatedDF <- bind_rows(loadedList)[bind_rows(loadedList)$DStype == 1,]
+
+
+AggregatedDF$Dataset <- factor(AggregatedDF$Dataset, c("Sample_S20812_258","Sample_S20813_259","Sample_S20814_260","Sample_S20272_157","Sample_S20273_158"))
+
+
+
+
+```
+
+## __3. Doublets rate by total non-empty droplets software-wise__
+
+
+```{r, collapse=TRUE, fig.height=6, fig.width=6}
+
+AggregatedDF$DBLsRate <- round(AggregatedDF$DBLsRate/100,2)
+
+p<-ggplot(AggregatedDF, aes(x=Dataset, y=DBLsRate, group=Software)) +
+  geom_line(aes(color=Software))+
+  geom_point(aes(color=Software, size=TotalDroplets))+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, vjust=.5))
+
+p
+
+#ggsave(p, file="/hpcnfs/scratch/temporary/Dav_vc/20_Final_DMX/plotTest.png")
+
+```
+
+
+
+
+## __4. Best tools agreement __
+
+
+```{r, collapse=TRUE, fig.height=10, fig.width=15, warning = FALSE, dpi=300, dev='svg'}
+
+AgreementDF <- data.frame(matrix(, nrow=0, ncol=length(colnames(AggregatedDF))))
+AgreementCols <- colnames(AggregatedDF)[(colnames(AggregatedDF) %in% c("TotalDroplets","Dataset","best_agreement")) | grepl("shared_", colnames(AggregatedDF))]
+
+for (ds in unique(AggregatedDF$Dataset)){
+  AgreementDF <- rbind(AgreementDF, head(AggregatedDF[AggregatedDF$Dataset == ds,AgreementCols],1))
+}
+
+AgreementDF <- reshape2::melt(AgreementDF, id.vars=c("Dataset","best_agreement","TotalDroplets"),value.name = "Agreement_rate")
+AgreementDF$variable <- as.character(AgreementDF$variable)
+AgreementDF$sharedType <- as.factor(ifelse((AgreementDF$variable != "shared_doublet") & (AgreementDF$variable != "shared_unassigned") & (AgreementDF$variable != "shared_overall"), "shared_singlet", AgreementDF$variable))
+AgreementDF$variable <- as.factor(AgreementDF$variable)
+
+
+p2 <- ggplot(data=AgreementDF, aes(x=Dataset, y=Agreement_rate)) +
+geom_point(aes(color=sharedType, shape=best_agreement), size=5, stackdir='center')+
+geom_text(aes(label=ifelse(sharedType=="shared_overall",Agreement_rate,''),hjust=-0.5,vjust=0, color =sharedType ),size=5, )+
+theme_bw()+
+theme(axis.text.x = element_text(angle = 45, vjust=.5, size = 15))+
+theme(axis.text.y = element_text(size = 15))+
+scale_color_brewer(palette="Dark2")
+
+
+
+
+p2
+
+
+```
+
+
+## __4.2 Best tools agreement __
+
+
+```{r, collapse=TRUE, fig.height=10, fig.width=15, warning = FALSE, dpi=300, dev='svg'}
+
+
+AgreementDF <- data.frame(matrix(, nrow=0, ncol=length(colnames(AggregatedDF))))
+AgreementCols <- colnames(AggregatedDF)[(colnames(AggregatedDF) %in% c("TotalDroplets","Dataset","best_agreement")) | grepl("shared_", colnames(AggregatedDF))]
+
+for (ds in unique(AggregatedDF$Dataset)){
+  AgreementDF <- rbind(AgreementDF, head(AggregatedDF[AggregatedDF$Dataset == ds,AgreementCols],1))
+}
+
+
+
+AgreementDF$shared_singlet_median <- round(apply(AgreementDF[colnames(AgreementDF)[(grepl("shared_", colnames(AgreementDF))) & (colnames(AgreementDF) != "shared_overall") & (colnames(AgreementDF) != "shared_unassigned") & (colnames(AgreementDF) != "shared_doublet")]],1, median, na.rm = TRUE),2)
+
+AgreementDF$shared_singlet_sd <- round(apply(AgreementDF[colnames(AgreementDF)[(grepl("shared_", colnames(AgreementDF))) & (colnames(AgreementDF) != "shared_overall") & (colnames(AgreementDF) != "shared_unassigned") & (colnames(AgreementDF) != "shared_doublet")]],1, sd, na.rm = TRUE),2)
+
+
+AgreementDF <- AgreementDF[,c("TotalDroplets", "Dataset","shared_doublet","shared_unassigned","shared_overall","shared_singlet_median","best_agreement","shared_singlet_sd")]
+
+
+
+AgreementDF <- reshape2::melt(AgreementDF, id.vars=c("Dataset","best_agreement","TotalDroplets","shared_singlet_sd"),value.name = "Agreement_rate")
+AgreementDF$variable <- as.character(AgreementDF$variable)
+AgreementDF$sharedType <- as.factor(ifelse((AgreementDF$variable != "shared_doublet") & (AgreementDF$variable != "shared_unassigned") & (AgreementDF$variable != "shared_overall"), "shared_singlet", AgreementDF$variable))
+AgreementDF$variable <- as.factor(AgreementDF$variable)
+
+
+AgreementDF$shared_singlet_sd <- ifelse(AgreementDF$sharedType == "shared_singlet", AgreementDF$shared_singlet_sd, 0 )
+
+
+p2 <- ggplot(data=AgreementDF, aes(x=Dataset, y=Agreement_rate)) +
+geom_point(aes(color=variable, shape=best_agreement), size=6, stackdir='center')+
+geom_text(aes(label=ifelse(sharedType=="shared_overall",Agreement_rate,''),hjust=-0.5,vjust=0, color =variable ),size=5, )+
+geom_segment(aes(x = Dataset, y = Agreement_rate-shared_singlet_sd, xend = Dataset, yend = Agreement_rate+shared_singlet_sd, color =variable))+
+  theme_bw()+
+theme(axis.text.x = element_text(angle = 45, vjust=.5, size = 15))+
+theme(axis.text.y = element_text(size = 15))+
+scale_color_brewer(palette="Dark2")
+
+
+
+
+p2
+
+
+```
+
+## __5. Log Counts by ID __
+
+
+```{r, collapse=TRUE, fig.height=8, fig.width=20, warning = FALSE,  dpi=300, dev='svg'}
+
+LogCols <- colnames(AggregatedDF)[(colnames(AggregatedDF) %in% c("Software","Dataset")) | grepl("logCounts_", colnames(AggregatedDF))]
+LogDF <- AggregatedDF[LogCols]
+LogDF <- reshape2::melt(LogDF, id.vars=c("Software","Dataset"),value.name = "Median_Log_counts")
+
+LogDF$variable <- str_replace(as.character(LogDF$variable), "logCounts_", "")
+
+
+LogDF$ID_type <- as.factor(ifelse((LogDF$variable != "doublet") & (LogDF$variable != "unassigned"), "singlet", LogDF$variable))
+LogDF$ID_type <- factor(LogDF$ID_type, c("singlet","doublet","unassigned"))
+
+LogDF$Dataset <- factor(AggregatedDF$Dataset, c("Sample_S20812_258","Sample_S20813_259","Sample_S20814_260","Sample_S20272_157","Sample_S20273_158"))
+
+LogDF$variable <- as.factor(LogDF$variable)
+
+
+
+
+p3 <- ggplot(data=LogDF, aes(x=Software, y=Median_Log_counts, group = Dataset)) +
+geom_point(position = position_dodge(width=.5), aes(color= ID_type, shape = Dataset), size = 3)+
+theme_bw()+
+ theme(
+  legend.title = element_text(size = 20),
+  legend.text = element_text(size = 20)
+  )+
+theme(axis.text.x = element_text(angle = 45, vjust=.5, size = 12))+
+theme(axis.text.y = element_text(size = 20))+
+scale_color_brewer(palette="Dark2")
+
+
+p3
+
+
+```
+
+
+
+
+
+
+## __6. Accuracy Plot __
+
+
+```{r, collapse=TRUE,fig.height=10, fig.width=15, warning = FALSE, dpi=300, dev='svg'}
+
+
+#Storing metrices in DF list
+
+DSlist <- unlist(strsplit(params$DMXmetrices,","))
+DSNamesList <- unlist(strsplit(params$DSnames,","))
+
+loadedList <- list()
+for (DS in seq(1, length(DSlist))){
+  DSName <- DSNamesList[DS]
+  LoadedDS <- read.csv(DSlist[DS],  header = T, sep = "\t",stringsAsFactors=F)
+  if (LoadedDS$DStype[1] == "0") {
+    LoadedDS <- LoadedDS[colnames(LoadedDS)[!grepl("logCounts_", colnames(LoadedDS))]]
+    loadedList[[DSName]] <- LoadedDS
+  }
+}
+
+
+#Aggregate DF and select only non-synthetics
+AggregatedDFSynth <- bind_rows(loadedList)[,c("Software","Dataset","SynthAccuracy")]
+AggregatedDFSynth$SynthAccuracy <- round(AggregatedDFSynth$SynthAccuracy/100,2)
+
+
+p4<-ggplot(AggregatedDFSynth, aes(x=Software, y=SynthAccuracy, fill=Software)) +
+    geom_dotplot(binaxis='y', stackdir='center', dotsize=.7)+
+    theme_bw()+
+theme_bw()+
+ theme(
+  legend.title = element_text(size = 20),
+  legend.text = element_text(size = 20)
+  )+
+theme(axis.text.x = element_text(angle = 45, vjust=.5, size = 15))+
+theme(axis.text.y = element_text(size = 15))+
+    stat_summary(fun.y=mean, geom="point", shape=3,      size=3, aes(color=Software))
+
+p4
+
+```
+
+
+

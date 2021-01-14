@@ -1,0 +1,14 @@
+
+mkdir -p ./logs
+mkdir -p ./clusterLogs
+
+
+
+/hpcnfs/data/GT/.conda/snakemake_5.5.2/bin/snakemake --use-singularity --singularity-args '-B /hpcnfs/ -H /hpcnfs/scratch/temporary/Dav_vc/20_Final_DMX/tmp' \
+--keep-going \
+--cluster-config /hpcnfs/data/GT/snakemakepipelines/config.json \
+--printshellcmds \
+--cluster '{cluster.cluster} select=1:ncpus={cluster.ncpus}:mem={cluster.mem} -l \
+walltime={cluster.time} -N {cluster.jobname} -o ./clusterLogs/ -e ./clusterLogs/' \
+-j 15 \
+--latency-wait 60

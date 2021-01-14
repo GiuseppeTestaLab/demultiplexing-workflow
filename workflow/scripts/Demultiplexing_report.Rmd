@@ -1,0 +1,673 @@
+---
+title: "Multiplexing Software Benchmark"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    theme: 'yeti'
+    highlight: 'tango'
+    code_folding: hide
+params:
+    Dataset: NULL
+    Demuxlet_V1: NULL
+    Demuxlet_V2: NULL
+    SoC: NULL
+    Vireo: NULL
+    SCanSNP: NULL
+    BarcodeMap: NULL
+    FilteredFeaturesPath: NULL
+    outFile: NULL
+---
+
+
+####  Analysis is performed on `r params$Dataset`.
+
+## __1. SetUp__
+
+
+```{r, message = FALSE, collapse=TRUE}
+library(tidyr)
+library(combinat)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(gridExtra)
+library(grid)
+library(Seurat)
+
+options(stringsAsFactors = FALSE)
+```
+
+
+Parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+****
+
+## __2. Read data__
+
+ * Soup or Cell
+ * Vireo
+ * Demuxlet V1
+ * Demuxlet V2
+ * SCanSnp
+
+
+```{r ReadData,, collapse=TRUE}
+# SoC
+SoC <- read.csv(params$SoC, header = T, sep = "\t",stringsAsFactors=F)
+SoC$SoCID <- ifelse(SoC$status == "singlet", SoC$assignment, SoC$status)
+
+# Vireo
+Vireo <- read.csv(params$Vireo, header = T, sep = "\t",stringsAsFactors=F) %>% dplyr::rename(barcode=cell, VireoID=donor_id)
+Vireo <-  Vireo[,c("barcode","VireoID")]
+
+# Demuxlet V1
+Demuxlet_V1 <- read.csv(params$Demuxlet_V1, header = T, sep = "\t",stringsAsFactors=F) %>% dplyr::rename(barcode=BARCODE) %>%
+  tidyr::separate(BEST, c('dbltype', 'first','second'), sep="-")
+Demuxlet_V1$Demuxlet_V1_BEST <- ifelse(Demuxlet_V1$dbltype != "SNG", Demuxlet_V1$dbltype, Demuxlet_V1$first)
+Demuxlet_V1[Demuxlet_V1=="DBL"]<-"doublet"
+Demuxlet_V1[Demuxlet_V1=="AMB"]<-"unassigned"
+
+
+# Demuxlet V2
+Demuxlet_V2 <- read.csv(params$Demuxlet_V2, header = T, sep = "\t",stringsAsFactors=F)  %>% dplyr::rename(barcode=BARCODE) %>%
+  tidyr::separate(BEST.GUESS, c('BEST.GUESS_1', 'BEST.GUESS_2','Prop'), sep=",")
+Demuxlet_V2$Demuxlet_V2_BEST <- ifelse(Demuxlet_V2$DROPLET.TYPE != "SNG", Demuxlet_V2$DROPLET.TYPE, Demuxlet_V2$BEST.GUESS_1)
+Demuxlet_V2[Demuxlet_V2=="DBL"]<-"doublet"
+Demuxlet_V2[Demuxlet_V2=="AMB"]<-"unassigned"
+
+# ScanSnp
+Scansnp <- read.csv(params$SCanSNP, sep = "\t", header = T,stringsAsFactors=F) %>% dplyr::rename(barcode=Barcode, SCanSNPID=ID)
+Scansnp$SCanSNPID[Scansnp$SCanSNPID == "notclassified"] <- "unassigned"
+Scansnp[Scansnp=="Doublet"]<-"doublet"
+```
+
+
+
+```{r MergeData, collapse=TRUE}
+mergedIDs <- dplyr::select(SoC, c("barcode","SoCID"))  %>%
+  dplyr::inner_join(dplyr::select(Demuxlet_V1, c("barcode","Demuxlet_V1_BEST")),  by = "barcode") %>%
+  dplyr::inner_join(dplyr::select(Vireo, c("barcode","VireoID")),  by = "barcode") %>%
+  dplyr::inner_join(dplyr::select(Scansnp, c("barcode","SCanSNPID")),  by = "barcode") %>%
+    dplyr::inner_join(dplyr::select(Demuxlet_V2, c("barcode","Demuxlet_V2_BEST")), by = "barcode")
+
+#head(mergedIDs)
+
+#mergedIDs  <- merge(SoC, Demuxlet_V1,by = "barcode")
+#mergedIDs  <- merge(mergedIDs, Vireo ,by = "barcode")
+#mergedIDs  <- merge(mergedIDs, Scansnp ,by = "barcode")
+#mergedIDs  <- merge(mergedIDs, Demuxlet_V2 ,by = "barcode")
+```
+
+
+****
+
+## __3. Frequency of doublets__
+
+
+### 3.1 __Demuxlet V1: Frequency of doublets__
+
+```{r, collapse=TRUE}
+table(mergedIDs$Demuxlet_V1_BEST)["doublet"]
+round(prop.table(table(mergedIDs$Demuxlet_V1_BEST))*100, 2)
+
+```
+
+```{r, collapse=TRUE, fig.height=6, fig.width=6}
+DemTypeDF <- data.frame("dblType" = factor(ifelse((mergedIDs$Demuxlet_V1 != "doublet") & (mergedIDs$Demuxlet_V1 != "unassigned"), "singlet", mergedIDs$Demuxlet_V1)))
+
+DemType <- ggplot(data=DemTypeDF, aes(x=dblType, fill=dblType)) +
+  geom_bar(alpha=0.65) +
+  geom_text(stat='count', aes(label=..count..), vjust=1.2) +
+  ggtitle('Demuxlet: Doublet Number') + ylab('Droplet Number') + xlab('Droplet Type') +
+  scale_fill_hue(h=c(0, 120)) +
+  theme_bw()
+
+DemType
+```
+
+##### The percentage of __doublets__ detected __by Demuxlet V1 is `r round(table(mergedIDs$Demuxlet_V1_BEST)["doublet"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### The percentage of __unassigned__ detected __by Demuxlet V1 is `r round(table(mergedIDs$Demuxlet_V1_BEST)["unassigned"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
+
+
+
+### 3.1b __Demuxlet V2: Frequency of doublets__
+
+```{r, collapse=TRUE}
+table(mergedIDs$Demuxlet_V2_BEST)["doublet"]
+round(prop.table(table(mergedIDs$Demuxlet_V2_BEST))*100, 2)
+
+```
+
+```{r, collapse=TRUE, fig.height=6, fig.width=6}
+DemTypeV2DF <- data.frame("dblType" = factor(ifelse((mergedIDs$Demuxlet_V2 != "doublet") & (mergedIDs$Demuxlet_V2 != "unassigned"), "singlet", mergedIDs$Demuxlet_V2)))
+
+DemTypeV2 <- ggplot(data=DemTypeV2DF, aes(x=dblType, fill=dblType)) +
+  geom_bar(alpha=0.65) +
+  geom_text(stat='count', aes(label=..count..), vjust=1.2) +
+  ggtitle('Demuxlet V2: Doublet Number') + ylab('Droplet Number') + xlab('Droplet Type') +
+  scale_fill_hue(h=c(0, 120)) +
+  theme_bw()
+
+
+DemTypeV2
+```
+
+
+##### The percentage of __doublets__ detected __by Demuxlet V2 is `r round(table(mergedIDs$Demuxlet_V2_BEST)["doublet"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### The percentage of __unassigned__ detected __by Demuxlet V2 is `r round(table(mergedIDs$Demuxlet_V2_BEST)["unassigned"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
+
+
+
+
+### 3.2 __SoupOrCell: Frequency of doublets__
+
+```{r, collapse=TRUE}
+table(mergedIDs$SoCID)["doublet"]
+round(prop.table(table(mergedIDs$SoCID))*100, 2)
+```
+
+```{r, collapse=TRUE, fig.height=4.5, fig.width=8}
+SocDF <- data.frame("dblType" = factor(ifelse((mergedIDs$SoCID != "doublet") & (mergedIDs$SoCID != "unassigned"), "singlet", mergedIDs$SoCID)))
+
+SocType <- ggplot(data=SocDF, aes(x=dblType, fill=dblType)) +
+  geom_bar(alpha=0.65) +
+  geom_text(stat='count', aes(label=..count..), vjust=1.2) +
+  ggtitle('SoupOrCell: Doublet Number') + ylab('Droplet Number') + xlab('Droplet Type') +
+  scale_fill_hue(h=c(0, 120)) +
+  theme_bw()
+
+
+SocType
+```
+
+##### The percentage of __doublets__ detected __by SoupOrCell is `r round(table(mergedIDs$SoCID)["doublet"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### The percentage of __unassigned__ detected __by SoupOrCell is `r round(table(mergedIDs$SoCID)["unassigned"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
+
+
+
+### 3.3 __Vireo: Frequency of doublets__
+
+```{r, collapse=TRUE}
+table(mergedIDs$VireoID)["doublet"]
+round(prop.table(table(mergedIDs$VireoID))*100, 2)
+
+```
+
+```{r, collapse=TRUE, fig.height=4.5, fig.width=8}
+VireoDF <- data.frame("dblType" = factor(ifelse((mergedIDs$VireoID != "doublet") & (mergedIDs$VireoID != "unassigned"), "singlet", mergedIDs$VireoID)))
+
+VireoType <- ggplot(data=VireoDF, aes(x=dblType, fill=dblType)) +
+  geom_bar(alpha=0.65) +
+  geom_text(stat='count', aes(label=..count..), vjust=1.2) +
+  ggtitle('Vireo: Doublet Number') + ylab('Droplet Number') + xlab('Droplet Type') +
+  scale_fill_hue(h=c(0, 120)) +
+  theme_bw()
+
+
+VireoType
+```
+
+##### The percentage of __doublets__ detected __by Vireo is `r round(table(mergedIDs$VireoID)["doublet"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### The percentage of __unassigned__ detected __by Vireo is `r round(table(mergedIDs$VireoID)["unassigned"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
+
+
+### 3.4 __SCanSnp: Frequency of doublets__
+
+```{r, collapse=TRUE}
+
+table(mergedIDs$SCanSNPID)["doublet"]
+round(prop.table(table(mergedIDs$SCanSNPID))*100, 2)
+
+```
+
+```{r, collapse=TRUE, fig.height=4.5, fig.width=8}
+ScansnpDF <- data.frame("dblType" = factor(ifelse((mergedIDs$SCanSNPID != "doublet") & (mergedIDs$SCanSNPID != "unassigned"), "singlet", mergedIDs$SCanSNPID)))
+
+ScansnpType <- ggplot(data=ScansnpDF, aes(x=dblType, fill=dblType)) +
+  geom_bar(alpha=0.65) +
+  geom_text(stat='count', aes(label=..count..), vjust=1.2) +
+  ggtitle('SCanSNP: Doublet Number') + ylab('Droplet Number') + xlab('Droplet Type') +
+  scale_fill_hue(h=c(0, 120)) +
+  theme_bw()
+
+
+ScansnpType
+```
+
+
+##### The percentage of __doublets__ detected __by SCanSNP is `r round(table(mergedIDs$SCanSNPID)["doublet"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### The percentage of __unassigned__ detected __by SCanSNP is `r round(table(mergedIDs$SCanSNPID)["unassigned"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
+
+
+****
+
+## __4. Identity Assignment__
+
+### 4.1 __Plot of Cells Assignments across tools__
+
+```{r, echo = FALSE, warning  = FALSE}
+## SOC ID assignment
+
+Names <- as.vector(unique(mergedIDs$SoCID))
+SoCNoDBLs <- Names[Names != "doublet" & Names != "unassigned" ]
+
+DMX_IDs <- as.vector(unique(mergedIDs$Demuxlet_V2_BEST)[(unique(mergedIDs$Demuxlet_V2_BEST) != "doublet" & unique(mergedIDs$Demuxlet_V2_BEST) != "unassigned")])
+
+
+combinations <- permn(DMX_IDs)
+BestCombOverlap <- 0
+for(combination in seq(length(combinations))){
+  mergedIDs_temp <- mergedIDs
+  CombTemp <- combinations[[combination]]
+  SoCNoDBLs_temp <- SoCNoDBLs
+
+
+
+  for(pos in seq(length(CombTemp))){
+        SoCNoDBLs_temp[[pos]] <- CombTemp[[pos]]
+        mergedIDs_temp$SoCID[mergedIDs_temp$SoCID==SoCNoDBLs[[pos]]] <- CombTemp[[pos]]
+
+    if (pos == length(CombTemp)){
+      if (length(which(mergedIDs_temp$SoCID == mergedIDs_temp$Demuxlet_V2_BEST)) > BestCombOverlap){
+        mergedIDs_SoCMapped <- mergedIDs_temp
+        BestCombOverlap <- length(which(mergedIDs_temp$SoCID == mergedIDs_temp$Demuxlet_V2_BEST))
+        SoCMappings <- list("SoCClusters"=SoCNoDBLs, "Mappings"=SoCNoDBLs_temp)
+
+      }
+    }
+  }
+}
+
+
+BestCombOverlapRatio <- BestCombOverlap/length(mergedIDs$barcode)
+mappingsDF <- as.data.frame(SoCMappings)
+
+```
+<font size="4"> SoC Identities are predicted by overlapping SoC clusters (singlets only) with Demuxlet V2 BEST.GUESS (singlets only)
+Agreement was  `r round(BestCombOverlapRatio*100,2)`%</font>
+
+```{r, echo = FALSE, warning  = FALSE}
+
+mappingsDF
+
+```
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
+Software <- colnames(mergedIDs_SoCMapped)
+Software <- Software[Software != "barcode"]
+
+IDdf <- data_frame()
+for (tool in Software){
+  IDdf_temp<- as.data.frame(table(mergedIDs_SoCMapped[[tool]]), stringsAsFactors = F)
+  colnames(IDdf_temp) <- c("ID","Cells")
+  IDdf_temp$Software <- tool
+  IDdf <- rbind(IDdf,IDdf_temp)
+}
+
+ggplot(data=IDdf, aes(x=Software, y=Cells, fill=ID)) +
+  geom_bar(stat="identity", color="black",position=position_dodge())+
+  scale_fill_brewer(palette="Dark2")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(size =  15), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20))
+
+
+
+```
+
+
+### 4.2 __Pair-wise comparison__
+
+#### 4.2.1 __Demuxlet vs SoC__
+
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
+mosaicplot(~ Demuxlet_V1_BEST + SoCID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "SoC clusters - Demuxlet overlaps", las=2)
+```
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
+mosaicplot(~ Demuxlet_V2_BEST + SoCID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "SoC clusters - Demuxlet overlaps", las=2)
+```
+
+
+#### 4.2.2 __Demuxlet vs Vireo__
+
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
+mosaicplot(~ Demuxlet_V2_BEST + VireoID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "Vireo - Demuxlet  overlaps", las=2)
+```
+
+#### 4.2.3 __Demuxlet vs ScanSnp__
+
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
+mosaicplot(~ Demuxlet_V2_BEST + SCanSNPID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = " SCanSNP - Demuxlet  overlaps", las=2)
+```
+
+
+#### 4.2.4 __Vireo vs ScanSnp__
+
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
+mosaicplot(~ VireoID + SCanSNPID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "SCanSNP - Vireo overlaps", las=2)
+```
+
+
+#### 4.2.4 __Vireo vs SoC__
+
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
+mosaicplot(~ VireoID + SoCID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = " SoC clusters - Vireo overlaps", las=2)
+```
+
+
+#### 4.2.5 __SCanSNP vs SoC__
+
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
+mosaicplot(~ SCanSNPID + SoCID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "SoC clusters - SCanSNP overlaps", las=2)
+```
+
+
+### 4.3 __Plot of Agreement between softwares__
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
+
+
+SoftwareComb <- as.data.frame(combn(Software, 2), stringsAsFactors = F)
+
+AgreementDF <- data_frame()
+for (i in colnames(SoftwareComb)){
+  Tool1 <- SoftwareComb[[i]][1]
+  Tool2 <- SoftwareComb[[i]][2]
+  CombEntry <- paste0(Tool1, "_VS_", Tool2)
+  OverlapRatio <- round(length(which(mergedIDs_SoCMapped[[Tool1]] == mergedIDs_SoCMapped[[Tool2]]))/length(mergedIDs_SoCMapped[[Tool1]])*100,2)
+  AgreementDF_temp <- as.data.frame(data_frame(Software = CombEntry, AgreementRatio = OverlapRatio))
+  AgreementDF<- rbind(AgreementDF, AgreementDF_temp)
+}
+
+
+AgreementDF <- arrange(AgreementDF, AgreementRatio)
+AgreementDF$Software <- factor(AgreementDF$Software, levels = AgreementDF$Software)
+
+
+
+ggplot(data=AgreementDF, aes(x=Software, y = AgreementRatio,fill=Software)) +
+  geom_bar(stat="identity", color="black",position=position_dodge())+
+  scale_fill_brewer(palette="Set3")+
+  theme_minimal()+
+  coord_flip()+ theme(legend.position = "none")+
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 10))+
+  theme(axis.text.x = element_text(size =  15), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20))
+
+
+```
+
+
+### 5 __Counts Plot__
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 40, fig.width = 16}
+
+if (params$FilteredFeaturesPath != "None"){
+
+  par(mfrow=c(5,1))
+
+  sc.data <- Read10X(data.dir = params$FilteredFeaturesPath)
+  SeuratObject <- CreateSeuratObject(counts = sc.data)
+  rownames(mergedIDs_SoCMapped) <- mergedIDs_SoCMapped$barcode
+  SeuratObject[["SoCID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SoCID"]
+  SeuratObject[["Demuxlet_V1_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V1_BEST"]
+  SeuratObject[["VireoID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "VireoID"]
+  SeuratObject[["SCanSNPID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SCanSNPID"]
+  SeuratObject[["Demuxlet_V2_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V2_BEST"]
+  SeuratObject$log_counts <- log10(SeuratObject$nCount_RNA+1)
+
+plotList <- list()
+plotList[["SoCIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "SoCID", pt.size = 0.5)+ labs(title = "Soup or Cell IDs")
+plotList[["Demuxlet_V1_BESTplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "Demuxlet_V1_BEST", pt.size = 0.5)+ labs(title = "Demuxlet_V1 IDs")
+plotList[["VireoIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "VireoID", pt.size = 0.5)+ labs(title = "Vireo IDs")
+plotList[["SCanSNPIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "SCanSNPID", pt.size = 0.5)+ labs(title = "SCanSNP IDs")
+plotList[["Demuxlet_V2_BESTplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "Demuxlet_V2_BEST", pt.size = 0.5)+ labs(title = "Demuxlet_V2 IDs")
+
+CombinePlots(plotList, ncol = 1, legend = NULL)
+
+} else {
+print("Please provide Filtered Features path for counts plot across IDs")
+}
+
+```
+
+
+
+
+
+### 6 __Accuracy assessment__
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
+
+
+if (params$BarcodeMap != "None"){
+
+  BarcodeMap <- params$BarcodeMap
+
+  accuracyPlotList <- list()
+  SynthReferences <- read.csv(BarcodeMap, header = T, sep = "\t", stringsAsFactors = F , col.names = c("barcode","DBLstatus","ID"))
+
+
+HOMODBLs<-as.data.frame(str_split_fixed(data.frame(barcode = SynthReferences$barcode, ID= SynthReferences$ID, stringsAsFactors = F)$ID, ",", 2), stringsAsFactors = F)
+HOMODBLs$barcode <- data.frame(barcode = SynthReferences$barcode, ID= SynthReferences$ID, stringsAsFactors = F)$barcode
+HOMODBLs<-HOMODBLs[HOMODBLs$V1 == HOMODBLs$V2,]$barcode
+
+
+SynthReferences <- SynthReferences[! SynthReferences$barcode %in% HOMODBLs,]
+
+
+SynthReferences$ID <- ifelse(SynthReferences$DBLstatus == "Singlet", SynthReferences$ID, "doublet")
+
+
+
+
+
+mergedIDs_SoCMapped <- data.frame(lapply(mergedIDs_SoCMapped, function(x) {
+                  gsub("Sample_S20568_CFGSH52D18", "CFG", x)
+              }))
+
+mergedIDs_SoCMapped <- data.frame(lapply(mergedIDs_SoCMapped, function(x) {
+                  gsub("MIFF1DAY100REP1", "MIFF1", x)
+              }))
+mergedIDs_SoCMapped <- data.frame(lapply(mergedIDs_SoCMapped, function(x) {
+                  gsub("809_1_5", "809", x)
+              }))
+mergedIDs_SoCMapped <- data.frame(lapply(mergedIDs_SoCMapped, function(x) {
+                  gsub("KOLF2C1DAY100REP1", "KOLF", x)
+              }))
+mergedIDs_SoCMapped <- data.frame(lapply(mergedIDs_SoCMapped, function(x) {
+                  gsub("3391BDAY100REP1", "3391B", x)
+              }))
+
+merge_Synth <- merge(mergedIDs_SoCMapped, SynthReferences, by = "barcode")
+
+
+
+
+Software <- colnames(mergedIDs_SoCMapped)
+Software <- Software[Software != "barcode"]
+
+
+CorrectAssignsDF <- data_frame()
+for (tool in Software){
+  ToolID <- data_frame()
+  for (IdentityTemp in unique(merge_Synth$ID)){
+    ID_ss <- merge_Synth[merge_Synth$ID == IdentityTemp,]
+    ID_Agreement<-length(which(ID_ss[[tool]] == ID_ss$ID))/length(ID_ss$ID)
+    ToolID_temp <- as.data.frame(data_frame(Software = tool, Identity = IdentityTemp, CorrectAssigns = ID_Agreement))
+    ToolID <- rbind(ToolID,ToolID_temp )
+  }
+  CorrectAssignsDF <- rbind(ToolID, CorrectAssignsDF)
+}
+
+
+
+accuracyPlotList[["AccuracyPerLine"]] <- ggplot(data=CorrectAssignsDF, aes(x=Software, y=CorrectAssigns, fill=Identity)) +
+  geom_bar(stat="identity", position=position_dodge(0.6), width = 0.6)+
+  scale_fill_brewer(palette="Paired")+
+    labs(title="Accuracy Per ID")+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))+
+    theme(axis.text.x = element_text(size =  15), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20), plot.title = element_text(size = 30, face = "bold"))
+
+
+
+
+CorrectOverallAssignsDF <- data_frame()
+for (tool in Software){
+  OverallCorrectRatio <- length(which(merge_Synth[[tool]] == merge_Synth$ID))/length(merge_Synth$ID)*100
+  CorrectOverallAssignsDF_temp  <- data.frame(CorrectOverallAssignsRatio = OverallCorrectRatio, Software = tool)
+  CorrectOverallAssignsDF <- rbind(CorrectOverallAssignsDF, CorrectOverallAssignsDF_temp)
+
+}
+
+
+CorrectOverallAssignsDF <- arrange(CorrectOverallAssignsDF, CorrectOverallAssignsRatio)
+CorrectOverallAssignsDF$Software <- factor(CorrectOverallAssignsDF$Software, levels = CorrectOverallAssignsDF$Software)
+
+
+
+
+accuracyPlotList[["OverallAccuracy"]] <- ggplot(data=CorrectOverallAssignsDF, aes(x=Software, y = CorrectOverallAssignsRatio,fill=Software)) +
+  geom_bar(stat="identity", color="black",position=position_dodge())+
+  scale_fill_brewer(palette="Set3")+
+  theme_minimal()+
+  labs(title="Overall Accuracy")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  coord_flip()+ theme(legend.position = "none")+
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 10))+
+    theme(axis.text.x = element_text(size =  15), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20), plot.title = element_text(size = 30, face = "bold"))
+
+gridExtra::grid.arrange(grobs = accuracyPlotList, ncol =1,gp=gpar(fontsize=20))
+
+
+} else {
+print("Please provide BarcodeMap to assess the Deconvolution accuracy ")
+}
+
+
+```
+
+
+7 __Best Agreement metrices calculation__
+
+```{r , collapse=TRUE}
+
+bestComb <- unlist(strsplit(as.character(tail(AgreementDF[order(AgreementDF$AgreementRatio),"Software"],1)), "_VS_"))
+
+mergedIDs_SoCMappedSS <- mergedIDs_SoCMapped[colnames(mergedIDs_SoCMapped)[!colnames(mergedIDs_SoCMapped) %in% c("barcode","Demuxlet_V1_BEST")]]
+
+TotalIDsets <- list()
+for (id in unique(as.vector(t(mergedIDs_SoCMappedSS)))) {
+  TotalIDsets[[id]] <- c()
+  for (tool in bestComb){
+    tempVec <- ifelse(mergedIDs_SoCMapped[tool] == id, mergedIDs_SoCMapped$barcode, "remove")[ifelse(mergedIDs_SoCMapped[tool] == id, mergedIDs_SoCMapped$barcode, "remove") != "remove"]
+    TotalIDsets[[id]] <- unique(c(TotalIDsets[[id]], tempVec))
+  }
+  TotalIDsets[[id]] <- length(TotalIDsets[[id]])
+}
+
+
+
+IDagreementRatios <- list()
+for (id in unique(as.vector(t(mergedIDs_SoCMappedSS)))) {
+  nTools <- length(bestComb)
+
+  tempSS <- mergedIDs_SoCMappedSS[bestComb]
+  tempSS[tempSS==id]<-1
+  tempSS[tempSS!=1]<-0
+  tempSS <- sapply( tempSS, as.numeric )
+
+  IDagreementRatios[[paste0("shared_",id)]] <- round(length(which(rowSums(tempSS) == nTools))/TotalIDsets[[id]],2)
+
+}
+
+IDagreementRatios[["shared_overall"]] <- round(as.numeric(tail(AgreementDF[order(AgreementDF$AgreementRatio),"AgreementRatio"],1))/100,2)
+
+IDagreementRatios[["best_agreement"]] <- as.character(tail(AgreementDF[order(AgreementDF$AgreementRatio),"Software"],1))
+
+IDagreementRatiosDF <- as.data.frame(IDagreementRatios)
+
+
+```
+
+
+
+
+
+
+8 __Exporting results__
+
+```{r , collapse=TRUE}
+
+if (params$BarcodeMap == "None"){
+  DStype = "1"
+} else {
+  DStype = "0"
+
+}
+
+
+
+DSsize = dim(mergedIDs_SoCMapped)[1]
+
+MetricsDF <- data.frame(matrix(, nrow=0, ncol=5))
+colnames(MetricsDF) <- c("Software","DBLsRate","TotalDroplets","Dataset","DStype")
+
+toolsList <- colnames(mergedIDs_SoCMapped)[!colnames(mergedIDs_SoCMapped) %in% c("barcode")]
+IDsList <- unique(as.vector(t(mergedIDs_SoCMappedSS)))
+
+for (tool in toolsList){
+  ToolDBLsRatio <- as.numeric(round(table(mergedIDs_SoCMapped[tool])["doublet"]/DSsize*100,2))
+  toolRow <- data.frame("Software"=tool, "DBLsRate"=ToolDBLsRatio, "TotalDroplets"= DSsize, "Dataset"=params$Dataset, "DStype"=DStype)
+  toolRow <- cbind(toolRow,IDagreementRatiosDF )
+  MetricsDF <- rbind(MetricsDF, toolRow)
+}
+
+
+tool="SoCID"
+
+
+if (DStype == "0" ){
+  rownames(CorrectOverallAssignsDF) <- CorrectOverallAssignsDF$Software
+  MetricsDF$SynthAccuracy <- CorrectOverallAssignsDF[MetricsDF$Software,"CorrectOverallAssignsRatio"]
+  MockCountsDF <- data.frame(matrix(, nrow=length(toolsList), ncol=length(IDsList)))
+  #AppendMock Counts matrix
+  colnames(MockCountsDF) <- paste0("logCounts_",IDsList)
+  MetricsDF <- cbind(MetricsDF, MockCountsDF)
+} else {
+  MetricsDF$SynthAccuracy <- NA
+  countsPerToolDF <- data.frame(matrix(, nrow=0, ncol=length(IDsList)))
+  colnames(countsPerToolDF) <- paste0("logCounts_",IDsList)
+  for (tool in toolsList){
+    countsPerTool <- SeuratObject@meta.data[c(tool,"log_counts")]
+    countsPerTool <- aggregate(countsPerTool[,"log_counts"], list(countsPerTool[,tool]), median)
+    rownames(countsPerTool) <- paste0("logCounts_",countsPerTool$Group.1)
+    countsPerTool$Group.1 <- NULL
+    countsPerTool <- as.data.frame(t(countsPerTool))
+    rownames(countsPerTool) <- NULL
+    countsPerToolDF <- bind_rows( countsPerToolDF,countsPerTool)
+  }
+  MetricsDF <- cbind(MetricsDF, countsPerToolDF)
+}
+
+
+write.table(MetricsDF, file=params$outFile, sep = "\t", row.names = F, col.names = T,quote = F)
+
+
+```
