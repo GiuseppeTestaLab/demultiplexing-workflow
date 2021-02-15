@@ -1,144 +1,225 @@
+#!/usr/bin/env python
 
-import errno
-import os
-import yaml
+# import statements of necessary modules
+import getpass    # Portable password input (here used for access to usernames)
+import os         # Miscellaneous operating system interfaces
+import yaml       # YAML parser and emitter for Python
+# import snakemake  # Workflow management system
+
+# write files with g+rwX permissions
+os.umask(2)
+
+###########################################################################
+
+# input operations: read input file and config file,
+#                   define list of files to process
+
+# validate config with the yaml schema
+# snakemake.utils.validate(config, "schemas/config.schema.yaml")
+
+# read the yaml input file and store its content in the inputdata dictionary
+with open(config["inputfile"]) as f:
+    inputdata = yaml.full_load(f)
+# snakemake.utils.validate(inputdata, "schemas/input.schema.yaml")
+
+###########################################################################
+
+# preliminary actions: path and file definitions
+
+# define the reference files and dir, by extracting the information from the config file
+reference_label = inputdata["ref"]
+genome_file = config["reference_files"][reference_label]["genome"]
+
+# get the username and possibly map it using the dictionary in config.yaml file
+username = getpass.getuser()
+if username in config["userid_map"]:
+    username = config["userid_map"][username]
+
+# define directory where results will be stored... paths have the following structure:
+# {datapath}/SNPcall/{type of data}/{project}-{reference}/{user}
+set_id = "{0}-{1}".format(inputdata["project"], reference_label)
+demultiplexing_path = os.path.join(config["datapath"],"scRNAseq", "demultiplexing", set_id, username)
+report_path = os.path.join(config["datapath"], "scRNAseq", "reports", set_id, username)
+benchmark_path = os.path.join(config["datapath"], "scRNAseq", "benchmarks", set_id, username)
+# the following is a temporary path where intermediate BAM files are written
+processing_path = os.path.join(config["datapath"], "scRNAseq", "tmp_" + set_id + "_" + username)
+
+# define list of final count files
+sample_list = list(inputdata["samples"].keys())
+demult_files = []
+for sample in sample_list:
+    demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v1', '{}.best'.format(sample)))
+    demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v2', '{}.best'.format(sample)))
+    demult_files.append(os.path.join(demultiplexing_path, sample, 'vireo', 'vireo_out' 'donor_ids.tsv'))
+#   expand( WD + '{sample}/SoupOrCell/clusters.tsv', sample = NAMES),
+#   expand( WD + '{sample}/Demultiplexing.report.html',sample = NAMES),
 
 
-###################Tunable params########################
-#########################################################
-report: "./REPORT_SNAKEMAKE.rst"
-configfile: "/hpcnfs/data/GT/snakemakepipelines/config.json"
-inputfile='./samples.yaml'
+###########################################################################
 
-REFERENCEFASTA="/hpcnfs/scratch/GT/References/Ensembl/Assembly/Homo_sapiens.GRCh38.v93.dna.primary_assembly.fa"
-IMAGEPATH="/hpcnfs/data/GT/singularityImages/organoidMultiplexing_Final.sif"
-SOCIMAGEPATH="/hpcnfs/data/GT/singularityImages/souporcell_Final.sif"
+# common parameters
 
-###################END of params#########################
-#########################################################
-WD=os.getcwd()+'/'
+_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.0.0"
 
-
-
-
-NAMES = []
-BAMPATH={}
-VCFPATH={}
-K={}
-FIELD={}
-FILTEREDBARCODE={}
-
-
-with open(inputfile) as f:
-	inputdata = yaml.full_load(f)
-
-NAMES=inputdata['MultiplexedExperiments'].keys()
-
-
+###########################################################################
 
 rule all:
-	input:
-		#expand( WD + '{sample}/Demuxlet_V1/{sample}.best', sample = NAMES),
-		#expand(WD + '{sample}/Demuxlet_V2/{sample}.best', sample = NAMES),
-		#expand( WD + '{sample}/SoupOrCell/clusters.tsv', sample = NAMES),
-		#expand(WD + '{sample}/Vireo/vireoOut/donor_ids.tsv', sample = NAMES),
-		#expand( WD + '{sample}/Demultiplexing.report.html',sample = NAMES),
-		WD + 'AggregatedReport/AggregatedReport.html'
+    input:
+        demult_files#, multiqc_out = os.path.join(report_path, 'demultiplexing', 'report.html')
 
+###########################################################################
 
+rule demuxlet_v1:
+    input:
+        bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
+        vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
+        barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
+    output:
+        out = os.path.join(demultiplexing_path, '{sample}', 'demuxlet_v1', '{sample}.best')
+    container: _SINGULARITY_IMAGE
+    threads: 1
+    resources:
+        time = "18:00:00",
+        mem = "32G"
+    log:
+        os.path.join(demultiplexing_path, "{sample}", "demuxlet_v1.log")
+    benchmark:
+        os.path.join(benchmark_path, "demuxlet_v1.{sample}.txt")
+    params:
+        barcodes_ext = lambda wildcards, input: os.path.splitext(str(input.barcodes))[1],
+        outdir = lambda wildcards, output: os.path.dirname(output.out),
+        scratch_dir = config["scratchpath"],
+        field = lambda wildcards: inputdata['samples'][wildcards.sample]['field']
+    shell:
+        """
+        # copy and unzip, if needed, the file with the cell barcodes 
+        TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-barcodes.tsv)
+        if [ {params.barcodes_ext} = "tsv" ]; then
+            cat {input.barcodes} > $TMPFILE
+        elif [ {params.barcodes_ext} = "gz" ]; then
+            zcat {input.barcodes} > $TMPFILE
+        fi
+        
+        # compute the number of cells and a required parameter
+        NCELLS=`cat $TMPFILE | wc -l`
+        DBLPRIOR=`python -c "print('%.3f' % ($NCELLS/13000.))"`
+        echo $DBLPRIOR > {params.outdir}/dbl_prior.txt
 
+        # run demuxlet
+        demuxlet --sam {input.bam} \
+                 --vcf {input.vcf} \
+                 --field {params.field} \
+                 --out {params.outdir}/{wildcards.sample} \
+                 --group-list <( cat $TMPFILE ) \
+                 --doublet-prior $DBLPRIOR >& {log}
+                 
+        # remove temporary file
+        rm $TMPFILE
+        """
 
+###########################################################################
 
+rule demuxlet_v2:
+    input:
+        bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
+        vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
+        barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
+    output:
+        out = os.path.join(demultiplexing_path, '{sample}', 'demuxlet_v2', '{sample}.best')
+    container: _SINGULARITY_IMAGE
+    threads: 1
+    resources:
+        time = "18:00:00",
+        mem = "32G"
+    log:
+        os.path.join(demultiplexing_path, "{sample}", "demuxlet_v2.log")
+    benchmark:
+        os.path.join(benchmark_path, "demuxlet_v2.{sample}.txt")
+    params:
+        barcodes_ext = lambda wildcards, input: os.path.splitext(str(input.barcodes))[1],
+        outdir = lambda wildcards, output: os.path.dirname(output.out),
+        scratch_dir = config["scratchpath"],
+        field = lambda wildcards: inputdata['samples'][wildcards.sample]['field']
+    shell:
+        """
+        # copy and unzip, if needed, the file with the cell barcodes 
+        TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-barcodes.tsv)
+        if [ {params.barcodes_ext} = "tsv" ]; then
+            cat {input.barcodes} > $TMPFILE
+        elif [ {params.barcodes_ext} = "gz" ]; then
+            zcat {input.barcodes} > $TMPFILE
+        fi
+        
+        # compute the number of cells and a required parameter
+        NCELLS=`cat $TMPFILE | wc -l`
+        DBLPRIOR=`python -c "print('%.3f' % ($NCELLS/13000.))"`
+        echo $DBLPRIOR > {params.outdir}/dbl_prior.txt
 
+        # run demuxlet
+        popscle demuxlet --sam {input.bam} \
+                         --vcf {input.vcf} \
+                         --out {params.outdir}/{wildcards.sample} \
+                         --field {params.field} \
+                         --group-list $TMPFILE \
+                         --doublet-prior $DBLPRIOR >& {log}
+                 
+        # remove temporary file
+        rm $TMPFILE                         
+        """
 
+###########################################################################
 
-######################################################## Demuxlet V1 ######################################
-##################################################################################################################
-rule DEMUXLET_v1:
-	input:
-		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
-		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
-		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
-	output:
-		Demuxlet_V1 =  WD + '{sample}/Demuxlet_V1/{sample}.best',
-	params:
-		ext= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes'].split('.')[-1],
-		field= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['field']
-	singularity:
-		IMAGEPATH
-	log:"logs/DEMUXLET_v1.{sample}.log"
-	shell:
-		"""
-		exec 2>{log}
-		mkdir -p {WD}{wildcards.sample}/Demuxlet_V1
-		cd {WD}{wildcards.sample}/Demuxlet_V1
+rule vireo:
+    input:
+        bam=lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
+        vcf=lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
+        barcodes=lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
+    output:
+        out=os.path.join(demultiplexing_path,"{sample}",'vireo','vireo_out' 'donor_ids.tsv')
+    container: _SINGULARITY_IMAGE
+    threads: 10
+    resources:
+        time="18:00:00",
+        mem="32G"
+    log:
+        os.path.join(demultiplexing_path,"{sample}","vireo.log")
+    benchmark:
+        os.path.join(benchmark_path,"vireo.{sample}.txt")
+    params:
+        barcodes_ext=lambda wildcards, input: os.path.splitext(str(input.barcodes))[1],
+        genotag=lambda wildcards: inputdata['samples'][wildcards.sample]['field'],
+        outdir=lambda wildcards, output: os.path.dirname(output.out),
+        outdir_cellsnp=os.path.join(demultiplexing_path,"{sample}",'vireo','cellSNP_out'),
+        scratch_dir=config["scratchpath"]
+    shell:
+        """
+        # copy and unzip, if needed, the file with the cell barcodes 
+        TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-barcodes.tsv)
+        if [ {params.barcodes_ext} = "tsv" ]; then
+            cat {input.barcodes} > $TMPFILE
+        elif [ {params.barcodes_ext} = "gz" ]; then
+            zcat {input.barcodes} > $TMPFILE
+        fi
 
-		if [ {params.ext} = "tsv" ]; then
-		nCells=`cat {input.barcodeFile} | wc -l`
-		dblPrior=$(bc <<< "scale=3;$nCells/130000")
-		echo $dblPrior > {WD}{wildcards.sample}/Demuxlet_V1/dblPrior.txt
-		demuxlet --sam {input.bampath} \
-		--vcf {input.vcfpath} \
-		--field {params.field} \
-		--out {WD}{wildcards.sample}/Demuxlet_V1/{wildcards.sample} \
-		--group-list <( cat {input.barcodeFile}) \
-		--doublet-prior $dblPrior
-		elif [ {params.ext} = "gz" ]; then
-		nCells=`zcat {input.barcodeFile} | wc -l`
-		dblPrior=$(bc <<< "scale=3;$nCells/130000")
-		echo $dblPrior > {WD}{wildcards.sample}/Demuxlet_V1/dblPrior.txt
-		demuxlet --sam {input.bampath} \
-		--vcf {input.vcfpath} \
-		--field {params.field} \
-		--out {WD}{wildcards.sample}/Demuxlet_V1/{wildcards.sample} \
-		--group-list <( zcat {input.barcodeFile}) \
-		--doublet-prior $dblPrior
-		fi
-		"""
+        # run cellSNP
+        cellSNP -s {input.bam} \
+                -b $TMPFILE \
+                -O {params.outdir_cellsnp} \
+                -R {input.vcf} \
+                -p {threads} \
+                --minMAF 0.1 \
+                --minCOUNT 20        
+        # run vireo
+        vireo  -c {params.outdir_cellsnp} \
+               -d <(grep -v '\.\/\.' {input.vcf}) \
+               --genoTag {params.genotag} \
+               -o {params.outdir}
 
+        # remove temporary file
+        rm $TMPFILE               
+        """
 
-
-######################################################## Demuxlet V2  ######################################
-##################################################################################################################
-rule DEMUXLET_v2:
-	input:
-		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
-		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
-		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
-	output:
-		Demuxlet_V2 =  WD + '{sample}/Demuxlet_V2/{sample}.best',
-	params:
-		ext= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes'].split('.')[-1],
-		field= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['field']
-	singularity:
-		IMAGEPATH
-	log:"logs/DEMUXLET_v2.{sample}.log"
-	shell:
-		"""
-		exec 2>{log}
-		mkdir -p {WD}{wildcards.sample}/Demuxlet_V2
-		cd {WD}{wildcards.sample}/Demuxlet_V2
-
-		cd {WD}{wildcards.sample}
-		if [ {params.ext} = "gz" ]; then
-		zcat {input.barcodeFile} > {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv
-		elif [ {params.ext} = "tsv" ]; then
-		cp {input.barcodeFile} {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv
-		fi
-		nCells=`cat {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv | wc -l`
-		dblPrior=$(bc <<< "scale=3;$nCells/130000")
-		echo $dblPrior > {WD}{wildcards.sample}/Demuxlet_V2/dblPrior.txt
-		popscle demuxlet \
-		--sam {input.bampath} \
-		--vcf {input.vcfpath} \
-		--out {WD}{wildcards.sample}/Demuxlet_V2/{wildcards.sample} \
-		--field {params.field} \
-		--group-list {WD}{wildcards.sample}/Demuxlet_V2/barcodes.tsv \
-		--doublet-prior $dblPrior
-		"""
-
-
-
+###########################################################################
 
 ####################################################### SoupOrCell  ######################################
 #################################################################################################################
@@ -182,56 +263,6 @@ rule SoupOrCell:
 		-k {params.k}
 		fi
 		"""
-
-
-######################################################## Vireo  ######################################
-##################################################################################################################
-rule Vireo:
-	input:
-		bampath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['BAM'],
-		vcfpath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['VCF'],
-		barcodeFile = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes']
-	output:
-		Vireo = WD + '{sample}/Vireo/vireoOut/donor_ids.tsv',
-	params:
-		ext= lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['goodBarcodes'].split('.')[-1],
-		ncpus = config['Vireo']['ncpus'],
-		genotag = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['field']
-	singularity:
-		IMAGEPATH
-	log:"logs/Vireo.{sample}.log"
-	shell:
-		"""
-		exec 2>{log}
-		mkdir -p {WD}{wildcards.sample}/Vireo/cellSNPout
-		mkdir -p {WD}{wildcards.sample}/Vireo/vireoOut
-		cd {WD}{wildcards.sample}/Vireo
-
-		if [ {params.ext} = "gz" ]; then
-		zcat {input.barcodeFile} > {WD}{wildcards.sample}/Vireo/unzippedBC_Vire.tsv
-		cellSNP -s {input.bampath} \
-		-b {WD}{wildcards.sample}/Vireo/unzippedBC_Vire.tsv \
-		-O {WD}{wildcards.sample}/Vireo/cellSNPout \
-		-R {input.vcfpath} \
-		-p {params.ncpus} \
-		--minMAF 0.1 \
-		--minCOUNT 20
-		elif [ {params.ext} = "tsv" ]; then
-		cellSNP -s {input.bampath} \
-		-b {input.barcodeFile} \
-		-O {WD}{wildcards.sample}/Vireo/cellSNPout \
-		-R {input.vcfpath} \
-		-p {params.ncpus} \
-		--minMAF 0.1 \
-		--minCOUNT 20
-		fi
-
-		vireo  -c {WD}{wildcards.sample}/Vireo/cellSNPout \
-		-d <(grep -v '\.\/\.' {input.vcfpath}) \
-		--genoTag {params.genotag} \
-		-o {WD}{wildcards.sample}/Vireo/vireoOut
-		"""
-
 
 #########################################################--Fire up SCanSNP MTRIXGEN MODE--######################################
 ##################################################################################################################
