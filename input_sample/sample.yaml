@@ -1,0 +1,31 @@
+# example input file
+
+# identifiers of the reference data to be used
+# e.g. "cellranger_human_GRCh38-2020-A" for cellranger reference or "gencode_human_35" for GENCODE
+ref: "..."
+
+# name of the project, this label will be used to define the path where output files will be created
+project: "..."
+
+# output files will be written using this directory naming convention:
+#                     {datapath}/scRNAseq/{type of data}/{project}_{reference}/{user}
+# where: {datapath} is the root of the storage area (platform-dependent),
+# {type of data} is a label to organize the output depending on the type of file (e.g. "demultiplexing", "reports"...)
+
+# list of the samples, each listing the files that are required for the demultiplexing processing
+# the keys that define the samples (here: "rep01") are chosen by the user
+samples:
+
+    # each sample should contain the following keywords:
+    # bamfile: the path to the BAM file that has be obtained by the single-cell FASTQ alignment
+    # vcf: the joint vcf with the multiplexed genotypes
+    # barcodes: gzipped tsv or plain tsv file with the list of the cell barcodes
+    # field: tag for genotypes
+    rep01:
+        bamfile: ...
+        barcodes: ...
+        vcf: ...
+        field: "PL"
+        # ngenotypes: 5
+        # barcodesMap: ...
+        # FilteredFeaturesPath: ...
