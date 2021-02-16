@@ -59,7 +59,7 @@ for sample in sample_list:
 
 # common parameters
 
-_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.0.0"
+_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.1.0"
 
 ###########################################################################
 
@@ -208,12 +208,12 @@ rule vireo:
                 -R {input.vcf} \
                 -p {threads} \
                 --minMAF 0.1 \
-                --minCOUNT 20        
+                --minCOUNT 20 >& {log}
         # run vireo
         vireo  -c {params.outdir_cellsnp} \
                -d <(grep -v '\.\/\.' {input.vcf}) \
                --genoTag {params.genotag} \
-               -o {params.outdir}
+               -o {params.outdir} >>& {log}
 
         # remove temporary file
         rm $TMPFILE               
