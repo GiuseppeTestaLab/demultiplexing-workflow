@@ -94,9 +94,9 @@ rule demuxlet_v1:
         """
         # copy and unzip, if needed, the file with the cell barcodes 
         TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-barcodes.tsv)
-        if [ {params.barcodes_ext} = "tsv" ]; then
+        if [ {params.barcodes_ext} = ".tsv" ]; then
             cat {input.barcodes} > $TMPFILE
-        elif [ {params.barcodes_ext} = "gz" ]; then
+        elif [ {params.barcodes_ext} = ".gz" ]; then
             zcat {input.barcodes} > $TMPFILE
         fi
         
@@ -144,9 +144,9 @@ rule demuxlet_v2:
         """
         # copy and unzip, if needed, the file with the cell barcodes 
         TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-barcodes.tsv)
-        if [ {params.barcodes_ext} = "tsv" ]; then
+        if [ {params.barcodes_ext} = ".tsv" ]; then
             cat {input.barcodes} > $TMPFILE
-        elif [ {params.barcodes_ext} = "gz" ]; then
+        elif [ {params.barcodes_ext} = ".gz" ]; then
             zcat {input.barcodes} > $TMPFILE
         fi
         
@@ -171,33 +171,33 @@ rule demuxlet_v2:
 
 rule vireo:
     input:
-        bam=lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
-        vcf=lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
-        barcodes=lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
+        bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
+        vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
+        barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
     output:
-        out=os.path.join(demultiplexing_path,"{sample}",'vireo','vireo_out' 'donor_ids.tsv')
+        out = os.path.join(demultiplexing_path,"{sample}",'vireo','vireo_out' 'donor_ids.tsv')
     container: _SINGULARITY_IMAGE
     threads: 10
     resources:
-        time="18:00:00",
-        mem="32G"
+        time = "18:00:00",
+        mem = "32G"
     log:
         os.path.join(demultiplexing_path,"{sample}","vireo.log")
     benchmark:
         os.path.join(benchmark_path,"vireo.{sample}.txt")
     params:
-        barcodes_ext=lambda wildcards, input: os.path.splitext(str(input.barcodes))[1],
-        genotag=lambda wildcards: inputdata['samples'][wildcards.sample]['field'],
-        outdir=lambda wildcards, output: os.path.dirname(output.out),
-        outdir_cellsnp=os.path.join(demultiplexing_path,"{sample}",'vireo','cellSNP_out'),
-        scratch_dir=config["scratchpath"]
+        barcodes_ext = lambda wildcards, input: os.path.splitext(str(input.barcodes))[1],
+        genotag = lambda wildcards: inputdata['samples'][wildcards.sample]['field'],
+        outdir = lambda wildcards, output: os.path.dirname(output.out),
+        outdir_cellsnp = os.path.join(demultiplexing_path,"{sample}",'vireo','cellSNP_out'),
+        scratch_dir = config["scratchpath"]
     shell:
         """
         # copy and unzip, if needed, the file with the cell barcodes 
         TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-barcodes.tsv)
-        if [ {params.barcodes_ext} = "tsv" ]; then
+        if [ {params.barcodes_ext} = ".tsv" ]; then
             cat {input.barcodes} > $TMPFILE
-        elif [ {params.barcodes_ext} = "gz" ]; then
+        elif [ {params.barcodes_ext} = ".gz" ]; then
             zcat {input.barcodes} > $TMPFILE
         fi
 
