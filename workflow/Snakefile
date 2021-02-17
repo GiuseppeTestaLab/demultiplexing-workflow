@@ -241,9 +241,9 @@ rule souporcell_container:
         cd {params.outdir}
         # download the file
         CONFIRM=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate \
-                  'https://docs.google.com/uc?export=download&id=1tj2j8QZuGz8sylHgWbnejWyUn8n6m0Y8' -O- \ 
-                  | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')
-        wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$CONFIRM&id=1tj2j8QZuGz8sylHgWbnejWyUn8n6m0Y8" -O souporcell.sif 
+                  'https://docs.google.com/uc?export=download&id=1tj2j8QZuGz8sylHgWbnejWyUn8n6m0Y8' -O- \
+                  | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p')
+        wget --quiet --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$CONFIRM&id=1tj2j8QZuGz8sylHgWbnejWyUn8n6m0Y8" -O souporcell.sif 
         rm -rf /tmp/cookies.txt
         """
 
