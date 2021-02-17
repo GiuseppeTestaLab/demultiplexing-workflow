@@ -51,7 +51,7 @@ demult_files = []
 for sample in sample_list:
     demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v1', '{}.best'.format(sample)))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v2', '{}.best'.format(sample)))
-    demult_files.append(os.path.join(demultiplexing_path, sample, 'vireo', 'vireo_out' 'donor_ids.tsv'))
+    demult_files.append(os.path.join(demultiplexing_path, sample, 'vireo', 'vireo_out', 'donor_ids.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'souporcell', 'clusters.tsv'))
 #   expand( WD + '{sample}/Demultiplexing.report.html',sample = NAMES),
 
@@ -178,27 +178,25 @@ rule demuxlet_v2:
 
 ###########################################################################
 
-rule vireo:
+rule cellsnp:
     input:
         bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
         vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
         barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
     output:
-        out = os.path.join(demultiplexing_path,"{sample}",'vireo','vireo_out' 'donor_ids.tsv')
+        out = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'cellSNP_out', 'cellSNP.samples.tsv')
     container: _SINGULARITY_IMAGE
     threads: 10
     resources:
         time = "18:00:00",
         mem = "32G"
     log:
-        os.path.join(demultiplexing_path,"{sample}","vireo.log")
+        os.path.join(demultiplexing_path, "{sample}", "vireo_1.log")
     benchmark:
         os.path.join(benchmark_path,"vireo.{sample}.txt")
     params:
         barcodes_ext = lambda wildcards, input: os.path.splitext(str(input.barcodes))[1],
-        genotag = lambda wildcards: inputdata['samples'][wildcards.sample]['field'],
         outdir = lambda wildcards, output: os.path.dirname(output.out),
-        outdir_cellsnp = os.path.join(demultiplexing_path,"{sample}",'vireo','cellSNP_out'),
         scratch_dir = config["scratchpath"]
     shell:
         """
@@ -213,19 +211,44 @@ rule vireo:
         # run cellSNP
         cellSNP -s {input.bam} \
                 -b $TMPFILE \
-                -O {params.outdir_cellsnp} \
+                -O {params.outdir} \
                 -R {input.vcf} \
                 -p {threads} \
                 --minMAF 0.1 \
                 --minCOUNT 20 >& {log}
-        # run vireo
-        vireo  -c {params.outdir_cellsnp} \
-               -d <(grep -v '\.\/\.' {input.vcf}) \
-               --genoTag {params.genotag} \
-               -o {params.outdir} >>& {log}
 
         # remove temporary file
         rm $TMPFILE               
+        """
+
+###########################################################################
+
+rule vireo:
+    input:
+        vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
+        cellsnp = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'cellSNP_out', 'cellSNP.samples.tsv')
+    output:
+        out = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv')
+    container: _SINGULARITY_IMAGE
+    threads: 10
+    resources:
+        time = "18:00:00",
+        mem = "32G"
+    log:
+        os.path.join(demultiplexing_path,"{sample}","vireo_2.log")
+    benchmark:
+        os.path.join(benchmark_path,"vireo.{sample}.txt")
+    params:
+        indir = lambda wildcards, input: os.path.dirname(input.cellsnp),
+        genotag = lambda wildcards: inputdata['samples'][wildcards.sample]['field'],
+        outdir = lambda wildcards, output: os.path.dirname(output.out)
+    shell:
+        """
+        # run vireo
+        vireo  -c {input.cellsnp} \
+               -d <(grep -v '\.\/\.' {input.vcf}) \
+               --genoTag {params.genotag} \
+               -o {params.outdir} >> {log} 2>&1
         """
 
 ###########################################################################
