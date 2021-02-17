@@ -272,7 +272,7 @@ rule souporcell_container:
 
 ###########################################################################
 
-rule sourorcell:
+rule souporcell:
     input:
         bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
         vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
@@ -294,7 +294,6 @@ rule sourorcell:
         barcodes_ext = lambda wildcards, input: os.path.splitext(str(input.barcodes))[1],
         ngenotypes = lambda wildcards: inputdata['samples'][wildcards.sample]['ngenotypes'],
         outdir = lambda wildcards, output: os.path.dirname(output.out),
-        
         genotag=lambda wildcards: inputdata['samples'][wildcards.sample]['field'],
         scratch_dir=config["scratchpath"]
     shell:
@@ -308,17 +307,17 @@ rule sourorcell:
         fi
 
         # run souporcell
-		souporcell_pipeline.py \
-		    -i {input.bam} \
+        souporcell_pipeline.py \
+            -i {input.bam} \
             -b $TMPFILE \
-		    -f {input.fasta} \
-		    -t {threads} \
-		    -o {params.outdir} \
-		    -k {params.ngenotypes} >& {log}
-		    
+            -f {input.fasta} \
+            -t {threads} \
+            -o {params.outdir} \
+            -k {params.ngenotypes} >& {log}
+                    
         # remove temporary file
         rm $TMPFILE
-		"""
+        """
 
 #########################################################--Fire up SCanSNP MTRIXGEN MODE--######################################
 ##################################################################################################################
