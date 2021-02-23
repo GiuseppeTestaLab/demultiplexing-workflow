@@ -19,7 +19,17 @@ params:
     outFile: NULL
 ---
 
-
+```{r, collapse=TRUE}
+params$Dataset <- snakemake@params[["dataset"]]
+params$Demuxlet_V1 <- snakemake@input[["demuxlet_v1"]]
+params$Demuxlet_V2 <- snakemake@input[["demuxlet_v2"]]
+params$SoC <- snakemake@input[["soc"]]
+params$Vireo <- snakemake@input[["vireo"]]
+params$SCanSNP <- snakemake@input[["scansnp"]]
+params$BarcodeMap <- snakemake@params[["barcode_map"]]
+params$FilteredFeaturesPath <- snakemake@params[["filtered_matrix"]]
+params$outFile <- snakemake@output[["combined_results"]]
+```
 ####  Analysis is performed on `r params$Dataset`.
 
 ## __1. SetUp__
@@ -616,15 +626,15 @@ IDagreementRatiosDF <- as.data.frame(IDagreementRatios)
 ```{r , collapse=TRUE}
 
 if (params$BarcodeMap == "None"){
-  DStype = "1"
+  DStype <- "1"
 } else {
-  DStype = "0"
+  DStype <- "0"
 
 }
 
 
 
-DSsize = dim(mergedIDs_SoCMapped)[1]
+DSsize <- dim(mergedIDs_SoCMapped)[1]
 
 MetricsDF <- data.frame(matrix(, nrow=0, ncol=5))
 colnames(MetricsDF) <- c("Software","DBLsRate","TotalDroplets","Dataset","DStype")
@@ -640,7 +650,7 @@ for (tool in toolsList){
 }
 
 
-tool="SoCID"
+tool <- "SoCID"
 
 
 if (DStype == "0" ){

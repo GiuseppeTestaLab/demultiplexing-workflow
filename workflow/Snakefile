@@ -357,31 +357,29 @@ rule scansnp:
         rm $TMPFILE
         """
 
-# #########################################################--DEMULTIPLEXINGREPORT--######################################
-# ##################################################################################################################
+###########################################################################
 
-
-rule DEMULTIPLEXINGREPORT:
-	input:
-		Demuxlet_V1 =  WD + '{sample}/Demuxlet_V1/{sample}.best',
-		Demuxlet_V2 = WD + '{sample}/Demuxlet_V2/{sample}.best',
-		SoC =  WD + '{sample}/SoupOrCell/clusters.tsv',
-		Vireo = WD + '{sample}/Vireo/vireoOut/donor_ids.tsv',
-		SCanSNP = WD + '{sample}/SCanSNP/doubletsMarked.tsv'
-	output:
-		htmlOut =  WD + '{sample}/Demultiplexing.report.html',
-		metricesOut =  WD + '{sample}/ReportFiles/{sample}.report.tsv',
-	params:
-		BarcodeMap = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['barcodesMap'],
-		FilteredFeaturesPath = lambda wildcards: inputdata['MultiplexedExperiments'][wildcards.sample]['FilteredFeaturesPath']
-	singularity:
-		IMAGEPATH
-	log:"logs/DEMULTIPLEXINGREPORT.{sample}.log"
-	shell:
-		"""
-		exec 2>{log}
-
-		mkdir -p {WD}{wildcards.sample}/ReportFiles
+rule sample_report:
+    input:
+        demuxlet_v1 = os.path.join(demultiplexing_path,'{sample}','demuxlet_v1','{sample}.best'),
+        demuxlet_v2 = os.path.join(demultiplexing_path,'{sample}','demuxlet_v2','{sample}.best'),
+        soc = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'clusters.tsv'),
+        vireo = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv'),
+        scansnp = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
+    output:
+        html =  os.path.join(report_path, "{sample}", 'report.html'),
+        combined_results =  os.path.join(report_path, "{sample}", 'combined_calls.tsv')
+    container: _SINGULARITY_IMAGE
+    threads: 1
+    resources:
+        time = "6:00:00",
+        mem = "4G"
+    params:
+        dataset = lambda wildcards: wildcards.sample,
+        filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'],
+        barcode_map = lambda wildcards: inputdata['samples'][wildcards.sample]['referencecall']
+    script:
+        "scripts/Demultiplexing_report.Rmd"
 
 Rscript -e "knitr::knit_meta(class=NULL, clean = TRUE); \
 Sys.setenv("MC_CORES"=3L); \
