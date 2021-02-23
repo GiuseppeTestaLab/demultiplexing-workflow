@@ -342,9 +342,10 @@ rule scansnp:
         scratch_dir = config["scratchpath"]
     shell:
         """
-        # activate conda environment with SCanSNP requirements
-        eval "$(conda shell.bash hook)"
-        conda activate scansnp
+        # activate conda environment with SCanSNP requirements, saving the env options to file
+        TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-activate_conda.sh)
+        conda shell.zsh hook > $TMPFILE
+        set +u; source $TMPFILE; conda activate scansnp; set -u
         # run SCanSNP
         python /usr/local/SCanSNP/SCanSNP/SCanSNP.py \
                --threads {threads} \
@@ -352,6 +353,8 @@ rule scansnp:
                --barcodes {input.barcodes} \
                --vcf {input.vcf} \
                --outdir {params.outdir} >& {log}
+        # clean up conda file
+        rm $TMPFILE
         """
 
 # #########################################################--DEMULTIPLEXINGREPORT--######################################
