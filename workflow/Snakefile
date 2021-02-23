@@ -53,9 +53,8 @@ for sample in sample_list:
     demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v2', '{}.best'.format(sample)))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'vireo', 'vireo_out', 'donor_ids.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'souporcell', 'clusters.tsv'))
-    demult_files.append(os.path.join(demultiplexing_path, sample, 'scansnp', 'Barcode-ID.tsv'))
-#   expand( WD + '{sample}/Demultiplexing.report.html',sample = NAMES),
-
+    demult_files.append(os.path.join(demultiplexing_path, sample, 'scansnp', 'Cell_IDs.tsv'))
+    # demult_files.append(os.path.join(report_path, sample, 'report.html'))
 
 ###########################################################################
 
@@ -328,8 +327,7 @@ rule scansnp:
         vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
         barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
     output:
-        barcodesid = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Barcode-ID.tsv'),
-        dblmetrics = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'DBLmetricsDF.tsv')
+        barcodesid = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
     container: _SINGULARITY_IMAGE
     threads: 10
     resources:
@@ -340,7 +338,8 @@ rule scansnp:
     benchmark:
         os.path.join(benchmark_path,"scansnp.{sample}.txt")
     params:
-        outdir = lambda wildcards, output: os.path.dirname(output.barcodesid)
+        outdir = lambda wildcards, output: os.path.dirname(output.barcodesid),
+        scratch_dir = config["scratchpath"]
     shell:
         """
         # activate conda environment with SCanSNP requirements
