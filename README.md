@@ -19,17 +19,19 @@ This Snakefile pipeline performs demultiplexing starting from Bamfile and VCF fi
 - Diagnostic plot on DBLs call and LowQuality
 - doubletsMarked.tsv with final ID assignment in the format 
 
-| Barcode  | ID      | TYPE    | Qual        | FirstID | SecondID | ID_Qual    |
-|----------|---------|---------|-------------|---------|----------|------------|
-| AAATGC-1 | IDX     | Singlet | GoodQuality | IDX     | IDY      | IDY        |
-| AAAGGC-1 | Doublet | Doublet | Doublet     | IDX     | IDY      | Doublet    |
-| ACGTCC-1 | IDY     | Singlet | LowQuality  | IDY     | IDX      | LowQuality |
+| Barcode  | ID_1 | ID_2 | ID_N | DBL_FirstID_Score | DBL_SecondID_Score | FirstID | SecondID | DropletType | ID      | Qual        |
+|----------|------|------|------|-------------------|--------------------|---------|----------|-------------|---------|-------------|
+| AAATGC-1 | 262  | 2    | 10   | 1077.41           | 39.29              | ID1     | IDN      | Singlet     | ID1     | GoodQuality |
+| AAAGGC-1 | 0    | 450  | 302  | 550.15            | 475.20             | ID2     | IDN      | Doublet     | Doublet | Doublet     |
+| ACGTCC-1 | 0    | 150  | 1    | 70.00             | 50.00              | ID2     | IDN      | Singlet     | ID2     | LowQuality  |
 
 In a nutshell: 
 
-ID column = ID and doublet information 
+ID_*: (corrected) reads overlapping ID-private SNPs
 
-ID_Qual column = ID , doublet and Quality information (use carefully and looking at mixture fitting QC plot)
+ID: ID and doublet information 
+
+Qual: Present only if  --flagLowQual set to True and contains Quality information (use carefully and looking at mixture fitting QC plot)
 
 
 ### Vireo output folder
