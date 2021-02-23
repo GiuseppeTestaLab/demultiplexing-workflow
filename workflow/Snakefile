@@ -61,7 +61,7 @@ for sample in sample_list:
 
 # common parameters
 
-_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.2.0"
+_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.3.0"
 
 localrules: souporcell_container
 
@@ -343,12 +343,16 @@ rule scansnp:
         outdir = lambda wildcards, output: os.path.dirname(output.barcodesid)
     shell:
         """
-        python3 /user/local/SCanSNP_v1/SCanSNP/SCanSNP.py \
-                --threads {threads} \
-                --bam {input.bam} \
-                --barcodes {input.barcodes} \
-                --vcf {input.vcf} \
-                --outdir {params.outdir} >& {log}
+        # activate conda environment with SCanSNP requirements
+        eval "$(conda shell.bash hook)"
+        conda activate scansnp
+        # run SCanSNP
+        python /usr/local/SCanSNP/SCanSNP/SCanSNP.py \
+               --threads {threads} \
+               --bam {input.bam} \
+               --barcodes {input.barcodes} \
+               --vcf {input.vcf} \
+               --outdir {params.outdir} >& {log}
         """
 
 # #########################################################--DEMULTIPLEXINGREPORT--######################################
