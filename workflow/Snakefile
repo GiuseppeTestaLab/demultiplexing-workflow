@@ -246,7 +246,7 @@ rule vireo:
     shell:
         """
         # run vireo
-        vireo  -c {input.cellsnp} \
+        vireo  -c {params.indir} \
                -d <(grep -v '\.\/\.' {input.vcf}) \
                --genoTag {params.genotag} \
                -o {params.outdir} >> {log} 2>&1
