@@ -381,42 +381,23 @@ rule sample_report:
     script:
         "scripts/Demultiplexing_report.Rmd"
 
-Rscript -e "knitr::knit_meta(class=NULL, clean = TRUE); \
-Sys.setenv("MC_CORES"=3L); \
-rmarkdown::render('/scripts/Demultiplexing_report.Rmd' , \
-intermediates_dir = '{WD}{wildcards.sample}/', \
-output_file = '{output.htmlOut}', \
-output_dir = '{WD}{wildcards.sample}/', \
-params = list( Dataset = '{wildcards.sample}' , FilteredFeaturesPath =  '{params.FilteredFeaturesPath}' , Demuxlet_V1 = '{input.Demuxlet_V1}', Demuxlet_V2 = '{input.Demuxlet_V2}', SoC = '{input.SoC}', Vireo = '{input.Vireo}' , SCanSNP = '{input.SCanSNP}', BarcodeMap = '{params.BarcodeMap}', outFile = '{output.metricesOut}' ))"
-		"""
+###########################################################################
 
+sample_demult_files = []
+for sample in sample_list:
+    sample_demult_files.append(os.path.join(report_path, sample, 'combined_calls.tsv'))
 
-
-rule DEMULTIPLEXINGAGGREGATION:
-	input:
-		MetricesList = expand(WD + '{sample}/ReportFiles/{sample}.report.tsv', sample = NAMES)
-	output:
-		htmlOut = WD + 'AggregatedReport/AggregatedReport.html'
-	params:
-		NamesList = list(NAMES)
-	singularity:
-		IMAGEPATH
-	log:"logs/DEMULTIPLEXINGAGGREGATION.log"
-	shell:
-		"""
-		exec 2>{log}
-
-		mkdir -p {WD}/ReportFiles
-
-		DMXmetrices=`echo {input.MetricesList} | sed 's/ /,/g'`
-		DSnames=`echo {params.NamesList} | sed 's/ /,/g'`
-
-
-Rscript -e "knitr::knit_meta(class=NULL, clean = TRUE); \
-Sys.setenv("MC_CORES"=3L); \
-rmarkdown::render('/scripts/Demultiplexing_aggregation.Rmd' , \
-intermediates_dir = '{WD}/AggregatedReport', \
-output_file = '{output.htmlOut}', \
-output_dir = '{WD}/AggregatedReport', \
-params = list( DSnames = '${{DSnames}}' , DMXmetrices =  '${{DMXmetrices}}'  ))"
-		"""
+rule aggregated_report:
+    input:
+        results_file = sample_demult_files
+    output:
+        html = os.path.join(report_path, 'aggregated_report.html')
+    container: _SINGULARITY_IMAGE
+    threads: 1
+    resources:
+        time = "6:00:00",
+        mem = "4G"
+    params:
+        sample_names = sample_list
+    script:
+        "scripts/Demultiplexing_aggregation.Rmd"

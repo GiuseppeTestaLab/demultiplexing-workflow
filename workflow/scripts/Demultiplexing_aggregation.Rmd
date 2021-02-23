@@ -12,6 +12,10 @@ params:
   DMXmetrices: NULL
 ---
 
+```{r, collapse=TRUE}
+params$DSnames <- snakemake@params[["sample_names"]]
+params$DMXmetrices <- snakemake@input[["results_file"]]
+```
 
 Parameters
 ```{r EnvironmentSetupI, collapse=TRUE}
@@ -43,9 +47,10 @@ options(stringsAsFactors = FALSE)
 
 #Storing metrices in DF list
 
-
-DSlist <- unlist(strsplit(params$DMXmetrices,","))
-DSNamesList <- unlist(strsplit(params$DSnames,","))
+DSlist <- params$DMXmetrices
+DSNamesList <- params$DSnames
+# DSlist <- unlist(strsplit(params$DMXmetrices,","))
+# DSNamesList <- unlist(strsplit(params$DSnames,","))
 
 loadedList <- list()
 for (DS in seq(1, length(DSlist))){
@@ -226,8 +231,10 @@ p3
 
 #Storing metrices in DF list
 
-DSlist <- unlist(strsplit(params$DMXmetrices,","))
-DSNamesList <- unlist(strsplit(params$DSnames,","))
+DSlist <- params$DMXmetrices
+DSNamesList <- params$DSnames
+# DSlist <- unlist(strsplit(params$DMXmetrices,","))
+# DSNamesList <- unlist(strsplit(params$DSnames,","))
 
 loadedList <- list()
 for (DS in seq(1, length(DSlist))){
