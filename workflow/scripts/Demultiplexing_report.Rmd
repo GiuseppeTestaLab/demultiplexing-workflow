@@ -578,10 +578,9 @@ print("Please provide BarcodeMap to assess the Deconvolution accuracy ")
 
 ```{r , collapse=TRUE}
 
-bestComb <- unlist(strsplit(as.character(tail(AgreementDF[order(AgreementDF$AgreementRatio),"Software"],1)), "_VS_"))
-
+AgreementDF_noDv1 <- AgreementDF[grep("Demuxlet_V1_BEST", AgreementDF$Software, invert=TRUE),]
+bestComb <- unlist(strsplit(as.character(AgreementDF_noDv1[order(AgreementDF_noDv1$AgreementRatio, decreasing = TRUE),"Software"][1]), "_VS_"))
 mergedIDs_SoCMappedSS <- mergedIDs_SoCMapped[colnames(mergedIDs_SoCMapped)[!colnames(mergedIDs_SoCMapped) %in% c("barcode","Demuxlet_V1_BEST")]]
-
 TotalIDsets <- list()
 for (id in unique(as.vector(t(mergedIDs_SoCMappedSS)))) {
   TotalIDsets[[id]] <- c()
@@ -591,30 +590,23 @@ for (id in unique(as.vector(t(mergedIDs_SoCMappedSS)))) {
   }
   TotalIDsets[[id]] <- length(TotalIDsets[[id]])
 }
-
-
-
 IDagreementRatios <- list()
 for (id in unique(as.vector(t(mergedIDs_SoCMappedSS)))) {
   nTools <- length(bestComb)
-
   tempSS <- mergedIDs_SoCMappedSS[bestComb]
   tempSS[tempSS==id]<-1
   tempSS[tempSS!=1]<-0
   tempSS <- sapply( tempSS, as.numeric )
-
   IDagreementRatios[[paste0("shared_",id)]] <- round(length(which(rowSums(tempSS) == nTools))/TotalIDsets[[id]],2)
-
 }
-
-IDagreementRatios[["shared_overall"]] <- round(as.numeric(tail(AgreementDF[order(AgreementDF$AgreementRatio),"AgreementRatio"],1))/100,2)
-
-IDagreementRatios[["best_agreement"]] <- as.character(tail(AgreementDF[order(AgreementDF$AgreementRatio),"Software"],1))
-
+IDagreementRatios[["shared_overall"]] <- round(as.numeric(AgreementDF_noDv1[order(AgreementDF_noDv1$AgreementRatio, decreasing = TRUE),"AgreementRatio"][1])/100,2)
+IDagreementRatios[["best_agreement"]] <- as.character(AgreementDF_noDv1[order(AgreementDF_noDv1$AgreementRatio, decreasing = TRUE),"Software"][1])
 IDagreementRatiosDF <- as.data.frame(IDagreementRatios)
 
-
 ```
+
+
+
 
 
 
