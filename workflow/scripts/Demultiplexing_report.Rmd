@@ -91,7 +91,7 @@ Demuxlet_V2[Demuxlet_V2=="DBL"]<-"doublet"
 Demuxlet_V2[Demuxlet_V2=="AMB"]<-"unassigned"
 
 # ScanSnp
-Scansnp <- read.csv(params$SCanSNP, sep = "\t", header = T,stringsAsFactors=F) %>% dplyr::rename(barcode=Barcode, SCanSNPID=ID)
+Scansnp <- read.csv(params$SCanSNP, sep = "\t", header = T,stringsAsFactors=F) %>% dplyr::rename(barcode=X, SCanSNPID=ID)
 Scansnp$SCanSNPID[Scansnp$SCanSNPID == "notclassified"] <- "unassigned"
 Scansnp[Scansnp=="Doublet"]<-"doublet"
 ```
