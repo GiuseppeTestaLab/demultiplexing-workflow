@@ -54,7 +54,7 @@ for sample in sample_list:
     demult_files.append(os.path.join(demultiplexing_path, sample, 'vireo', 'vireo_out', 'donor_ids.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'souporcell', 'clusters.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'scansnp', 'Cell_IDs.tsv'))
-    # demult_files.append(os.path.join(report_path, sample, 'report.html'))
+    demult_files.append(os.path.join(report_path, sample + '_demultiplexing.html'))
 
 ###########################################################################
 
@@ -68,7 +68,7 @@ localrules: souporcell_container
 
 rule all:
     input:
-        demult_files#, multiqc_out = os.path.join(report_path, 'demultiplexing', 'report.html')
+        demult_files
 
 onsuccess:
     print("Workflow completed with no error!")
@@ -367,17 +367,20 @@ rule sample_report:
         vireo = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv'),
         scansnp = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
     output:
-        html =  os.path.join(report_path, "{sample}", 'report.html'),
-        combined_results =  os.path.join(report_path, "{sample}", 'combined_calls.tsv')
+        html =  os.path.join(report_path, "{sample}" + '_demultiplexing.html')
     container: _SINGULARITY_IMAGE
     threads: 1
     resources:
         time = "6:00:00",
         mem = "4G"
+    log:
+        os.path.join(report_path, "{sample}", "sample_report.log")
     params:
         dataset = lambda wildcards: wildcards.sample,
         filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'],
-        barcode_map = lambda wildcards: inputdata['samples'][wildcards.sample]['referencecall']
+        barcode_map = lambda wildcards: inputdata['samples'][wildcards.sample]['referencecall'],
+        demult_metrics = os.path.join(report_path, "{sample}", 'demultiplexing_metrics.tsv'),
+        combined_results = os.path.join(report_path, "{sample}", 'combined_calls.tsv')
     script:
         "scripts/Demultiplexing_report.Rmd"
 
@@ -385,13 +388,13 @@ rule sample_report:
 
 sample_demult_files = []
 for sample in sample_list:
-    sample_demult_files.append(os.path.join(report_path, sample, 'combined_calls.tsv'))
+    sample_demult_files.append(os.path.join(report_path, sample + '_demultiplexing.html'))
 
 rule aggregated_report:
     input:
         results_file = sample_demult_files
     output:
-        html = os.path.join(report_path, 'aggregated_report.html')
+        html = os.path.join(report_path, 'demultiplexing_aggregated.html')
     container: _SINGULARITY_IMAGE
     threads: 1
     resources:
