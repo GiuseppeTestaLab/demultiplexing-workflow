@@ -8,6 +8,8 @@ This Snakefile pipeline performs demultiplexing starting from Bamfile and VCF fi
 - Vireo
 - SCanSNP
 
+![Rule graph](docs/rulegraph.png)
+
 # Content overview
 
 - Snakefile Main workflow for demultiplexing 
