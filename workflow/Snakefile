@@ -60,7 +60,7 @@ for sample in sample_list:
 
 # common parameters
 
-_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.3.0"
+_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.4.0"
 
 localrules: souporcell_container
 
