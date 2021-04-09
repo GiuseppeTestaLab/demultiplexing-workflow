@@ -5,7 +5,7 @@ import getpass    # Portable password input (here used for access to usernames)
 import os         # Miscellaneous operating system interfaces
 import yaml       # YAML parser and emitter for Python
 import shutil     # High-level file operations
-# import snakemake  # Workflow management system
+import snakemake  # Workflow management system
 
 # write files with g+rwX permissions
 os.umask(2)
@@ -16,7 +16,7 @@ os.umask(2)
 #                   define list of files to process
 
 # validate config with the yaml schema
-# snakemake.utils.validate(config, "schemas/config.schema.yaml")
+snakemake.utils.validate(config, "schemas/config.schema.yaml")
 
 # read the yaml input file and store its content in the inputdata dictionary
 with open(config["inputfile"]) as f:

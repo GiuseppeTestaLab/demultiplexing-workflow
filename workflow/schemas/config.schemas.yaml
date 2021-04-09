@@ -1,0 +1,71 @@
+$schema: http://json-schema.org/draft-06/schema#
+$ref: '#/definitions/Main'
+
+definitions:
+
+  ReferenceFileList:
+    additionalProperties: true
+    properties:
+      genome:
+        type: string
+    required:
+    - genome
+    title: ReferenceFileList
+    type: object
+
+  ReferenceFiles:
+    additionalProperties:
+      $ref: '#/definitions/ReferenceFileList'
+    title: ReferenceFiles
+    type: object
+
+  UseridMap:
+    additionalProperties:
+        type: string
+    title: UseridMap
+    type: object
+
+  Main:
+    additionalProperties: false
+    properties:
+      reference_files:
+        $ref: '#/definitions/ReferenceFiles'
+      userid_map:
+        $ref: '#/definitions/UseridMap'
+
+      datapath:
+        type: string
+      ltstoragepath:
+        type: string
+      scratchpath:
+        type: string
+      temporarypath:
+        type: string
+      singularitypath:
+        type: string
+
+      singularitymount:
+        items:
+          type: string
+        type: array
+
+      scheduler:
+        enum: [null, "pbs"]
+
+      inputfile:
+        type: string
+
+    required:
+    - reference_files
+    - userid_map
+    - datapath
+    - ltstoragepath
+    - scratchpath
+    - temporarypath
+    - singularitypath
+    - singularitymount
+    - scheduler
+    - inputfile
+
+    title: Main
+    type: object
