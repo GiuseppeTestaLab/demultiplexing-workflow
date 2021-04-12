@@ -8,6 +8,7 @@ output:
     highlight: 'tango'
     code_folding: hide
 params:
+    rmd: NULL
     Dataset: NULL
     Demuxlet_V1: NULL
     Demuxlet_V2: NULL
@@ -16,21 +17,23 @@ params:
     SCanSNP: NULL
     BarcodeMap: NULL
     FilteredFeaturesPath: NULL
-    outFile: NULL
+    metricsFile: NULL
+    callsFile: NULL
 ---
 
 ```{r, collapse=TRUE}
-params$Dataset <- snakemake@params[["dataset"]]
-params$Demuxlet_V1 <- snakemake@input[["demuxlet_v1"]]
-params$Demuxlet_V2 <- snakemake@input[["demuxlet_v2"]]
-params$SoC <- snakemake@input[["soc"]]
-params$Vireo <- snakemake@input[["vireo"]]
-params$SCanSNP <- snakemake@input[["scansnp"]]
-params$BarcodeMap <- snakemake@params[["barcode_map"]]
-params$FilteredFeaturesPath <- snakemake@params[["filtered_matrix"]]
-params$outFile <- snakemake@output[["combined_results"]]
+Dataset <- snakemake@params[["dataset"]]
+Demuxlet_V1 <- snakemake@input[["demuxlet_v1"]]
+Demuxlet_V2 <- snakemake@input[["demuxlet_v2"]]
+SoC <- snakemake@input[["soc"]]
+Vireo <- snakemake@input[["vireo"]]
+SCanSNP <- snakemake@input[["scansnp"]]
+BarcodeMap <- snakemake@params[["barcode_map"]]
+FilteredFeaturesPath <- snakemake@params[["filtered_matrix"]]
+metricsFile <- snakemake@params[["demult_metrics"]]
+callsFile <- snakemake@params[["combined_results"]]
 ```
-####  Analysis is performed on `r params$Dataset`.
+####  Analysis is performed on `r Dataset`.
 
 ## __1. SetUp__
 
@@ -51,8 +54,16 @@ options(stringsAsFactors = FALSE)
 
 Parameters
 ```{r EnvironmentSetupI, collapse=TRUE}
-for (i in 1:length(params))
-  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+  print(paste('Parameter: Dataset              - Value:', Dataset, '- Class:', class(Dataset)))
+  print(paste('Parameter: Demuxlet_V1          - Value:', Demuxlet_V1, '- Class:', class(Demuxlet_V1)))
+  print(paste('Parameter: Demuxlet_V2          - Value:', Demuxlet_V2, '- Class:', class(Demuxlet_V2)))
+  print(paste('Parameter: SoC                  - Value:', SoC, '- Class:', class(SoC)))
+  print(paste('Parameter: Vireo                - Value:', Vireo, '- Class:', class(Vireo)))
+  print(paste('Parameter: SCanSNP              - Value:', SCanSNP, '- Class:', class(SCanSNP)))
+  print(paste('Parameter: BarcodeMap           - Value:', BarcodeMap, '- Class:', class(BarcodeMap)))
+  print(paste('Parameter: FilteredFeaturesPath - Value:', FilteredFeaturesPath, '- Class:', class(FilteredFeaturesPath)))
+  print(paste('Parameter: metricsFile          - Value:', metricsFile, '- Class:', class(metricsFile)))
+  print(paste('Parameter: callsFile            - Value:', callsFile, '- Class:', class(callsFile)))
 ```
 
 ****
@@ -68,49 +79,47 @@ for (i in 1:length(params))
 
 ```{r ReadData,, collapse=TRUE}
 # SoC
-SoC <- read.csv(params$SoC, header = T, sep = "\t",stringsAsFactors=F)
+SoC <- read.csv(SoC, header = T, sep = "\t", stringsAsFactors=F)
 SoC$SoCID <- ifelse(SoC$status == "singlet", SoC$assignment, SoC$status)
 
 # Vireo
-Vireo <- read.csv(params$Vireo, header = T, sep = "\t",stringsAsFactors=F) %>% dplyr::rename(barcode=cell, VireoID=donor_id)
+Vireo <- read.csv(Vireo, header = T, sep = "\t", stringsAsFactors=F) %>%
+         dplyr::rename(barcode=cell, VireoID=donor_id)
 Vireo <-  Vireo[,c("barcode","VireoID")]
 
 # Demuxlet V1
-Demuxlet_V1 <- read.csv(params$Demuxlet_V1, header = T, sep = "\t",stringsAsFactors=F) %>% dplyr::rename(barcode=BARCODE) %>%
-  tidyr::separate(BEST, c('dbltype', 'first','second'), sep="-")
+Demuxlet_V1 <- read.csv(Demuxlet_V1, header = T, sep = "\t", stringsAsFactors=F) %>%
+               dplyr::rename(barcode=BARCODE) %>%
+               tidyr::separate(BEST, c('dbltype', 'first','second'), sep="-")
 Demuxlet_V1$Demuxlet_V1_BEST <- ifelse(Demuxlet_V1$dbltype != "SNG", Demuxlet_V1$dbltype, Demuxlet_V1$first)
-Demuxlet_V1[Demuxlet_V1=="DBL"]<-"doublet"
-Demuxlet_V1[Demuxlet_V1=="AMB"]<-"unassigned"
-
+Demuxlet_V1[Demuxlet_V1=="DBL"] <- "doublet"
+Demuxlet_V1[Demuxlet_V1=="AMB"] <- "unassigned"
 
 # Demuxlet V2
-Demuxlet_V2 <- read.csv(params$Demuxlet_V2, header = T, sep = "\t",stringsAsFactors=F)  %>% dplyr::rename(barcode=BARCODE) %>%
-  tidyr::separate(BEST.GUESS, c('BEST.GUESS_1', 'BEST.GUESS_2','Prop'), sep=",")
+Demuxlet_V2 <- read.csv(Demuxlet_V2, header = T, sep = "\t", stringsAsFactors=F)  %>%
+               dplyr::rename(barcode=BARCODE) %>%
+               tidyr::separate(BEST.GUESS, c('BEST.GUESS_1', 'BEST.GUESS_2', 'Prop'), sep=",")
 Demuxlet_V2$Demuxlet_V2_BEST <- ifelse(Demuxlet_V2$DROPLET.TYPE != "SNG", Demuxlet_V2$DROPLET.TYPE, Demuxlet_V2$BEST.GUESS_1)
-Demuxlet_V2[Demuxlet_V2=="DBL"]<-"doublet"
-Demuxlet_V2[Demuxlet_V2=="AMB"]<-"unassigned"
+Demuxlet_V2[Demuxlet_V2=="DBL"] <- "doublet"
+Demuxlet_V2[Demuxlet_V2=="AMB"] <- "unassigned"
 
 # ScanSnp
-Scansnp <- read.csv(params$SCanSNP, sep = "\t", header = T,stringsAsFactors=F) %>% dplyr::rename(barcode=X, SCanSNPID=ID)
+Scansnp <- read.csv(SCanSNP, sep = "\t", header = T, stringsAsFactors=F) %>%
+           dplyr::rename(barcode=X, SCanSNPID=ID)
 Scansnp$SCanSNPID[Scansnp$SCanSNPID == "notclassified"] <- "unassigned"
-Scansnp[Scansnp=="Doublet"]<-"doublet"
+Scansnp$SCanSNPID[Scansnp$SCanSNPID == "Doublet"] <- "doublet"
 ```
 
 
 
 ```{r MergeData, collapse=TRUE}
 mergedIDs <- dplyr::select(SoC, c("barcode","SoCID"))  %>%
-  dplyr::inner_join(dplyr::select(Demuxlet_V1, c("barcode","Demuxlet_V1_BEST")),  by = "barcode") %>%
-  dplyr::inner_join(dplyr::select(Vireo, c("barcode","VireoID")),  by = "barcode") %>%
-  dplyr::inner_join(dplyr::select(Scansnp, c("barcode","SCanSNPID")),  by = "barcode") %>%
-    dplyr::inner_join(dplyr::select(Demuxlet_V2, c("barcode","Demuxlet_V2_BEST")), by = "barcode")
+             dplyr::inner_join(dplyr::select(Demuxlet_V1, c("barcode","Demuxlet_V1_BEST")),  by = "barcode") %>%
+             dplyr::inner_join(dplyr::select(Vireo, c("barcode","VireoID")),  by = "barcode") %>%
+             dplyr::inner_join(dplyr::select(Scansnp, c("barcode","SCanSNPID")),  by = "barcode") %>%
+             dplyr::inner_join(dplyr::select(Demuxlet_V2, c("barcode","Demuxlet_V2_BEST")), by = "barcode")
 
-#head(mergedIDs)
-
-#mergedIDs  <- merge(SoC, Demuxlet_V1,by = "barcode")
-#mergedIDs  <- merge(mergedIDs, Vireo ,by = "barcode")
-#mergedIDs  <- merge(mergedIDs, Scansnp ,by = "barcode")
-#mergedIDs  <- merge(mergedIDs, Demuxlet_V2 ,by = "barcode")
+write.table(mergedIDs, file=callsFile, sep = "\t", row.names = F, col.names = T,quote = F)
 ```
 
 
@@ -427,12 +436,12 @@ ggplot(data=AgreementDF, aes(x=Software, y = AgreementRatio,fill=Software)) +
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 40, fig.width = 16}
 
-if (params$FilteredFeaturesPath != "None"){
+if (!is.null(FilteredFeaturesPath)){
 
   par(mfrow=c(5,1))
 
-  sc.data <- Read10X(data.dir = params$FilteredFeaturesPath)
-  SeuratObject <- CreateSeuratObject(counts = sc.data)
+  sc.data <- Read10X(data.dir = FilteredFeaturesPath)
+  SeuratObject <- CreateSeuratObject(counts = sc.data$`Gene Expression`)
   rownames(mergedIDs_SoCMapped) <- mergedIDs_SoCMapped$barcode
   SeuratObject[["SoCID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SoCID"]
   SeuratObject[["Demuxlet_V1_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V1_BEST"]
@@ -465,9 +474,7 @@ print("Please provide Filtered Features path for counts plot across IDs")
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
 
 
-if (params$BarcodeMap != "None"){
-
-  BarcodeMap <- params$BarcodeMap
+if (!is.null(BarcodeMap)){
 
   accuracyPlotList <- list()
   SynthReferences <- read.csv(BarcodeMap, header = T, sep = "\t", stringsAsFactors = F , col.names = c("barcode","DBLstatus","ID"))
@@ -606,25 +613,15 @@ IDagreementRatiosDF <- as.data.frame(IDagreementRatios)
 ```
 
 
-
-
-
-
-
-
-
 8 __Exporting results__
 
 ```{r , collapse=TRUE}
 
-if (params$BarcodeMap == "None"){
+if (is.null(BarcodeMap)){
   DStype <- "1"
 } else {
   DStype <- "0"
-
 }
-
-
 
 DSsize <- dim(mergedIDs_SoCMapped)[1]
 
@@ -636,14 +633,12 @@ IDsList <- unique(as.vector(t(mergedIDs_SoCMappedSS)))
 
 for (tool in toolsList){
   ToolDBLsRatio <- as.numeric(round(table(mergedIDs_SoCMapped[tool])["doublet"]/DSsize*100,2))
-  toolRow <- data.frame("Software"=tool, "DBLsRate"=ToolDBLsRatio, "TotalDroplets"= DSsize, "Dataset"=params$Dataset, "DStype"=DStype)
+  toolRow <- data.frame("Software"=tool, "DBLsRate"=ToolDBLsRatio, "TotalDroplets"= DSsize, "Dataset"=Dataset, "DStype"=DStype)
   toolRow <- cbind(toolRow,IDagreementRatiosDF )
   MetricsDF <- rbind(MetricsDF, toolRow)
 }
 
-
 tool <- "SoCID"
-
 
 if (DStype == "0" ){
   rownames(CorrectOverallAssignsDF) <- CorrectOverallAssignsDF$Software
@@ -668,8 +663,7 @@ if (DStype == "0" ){
   MetricsDF <- cbind(MetricsDF, countsPerToolDF)
 }
 
-
-write.table(MetricsDF, file=params$outFile, sep = "\t", row.names = F, col.names = T,quote = F)
+write.table(MetricsDF, file=metricsFile, sep = "\t", row.names = F, col.names = T,quote = F)
 
 
 ```
