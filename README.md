@@ -6,6 +6,7 @@
 Run the pipeline using **taglowquality=True** & **accountLowQuality=False** (SCanSNP will still add quality column but it won't be accounted during consensus generation) **>** Inspect Mixture model fitting plot & proportion of LowQuals **>** if needed rerun only consensus with **accountLowQuality=True** (SCanSNP will add quality column use the info in consensus generation)
 
 - Colname "barcode" is missing from SCanSNP Cell_ID output
+- Need SCanSNP to produce counts matrix also in **deconvolution** mode
 
 
 
