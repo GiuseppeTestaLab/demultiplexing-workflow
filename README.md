@@ -7,7 +7,7 @@ Run the pipeline using **taglowquality=True** & **accountLowQuality=False** (SCa
 
 - Colname "barcode" is missing from SCanSNP Cell_ID output
 - Need SCanSNP to produce counts matrix also in **deconvolution** mode
-
+- Replace Demuxlet V1 diagnostics with Consensus calls across the whole Demultiplexing_report.Rmd
 
 
 
