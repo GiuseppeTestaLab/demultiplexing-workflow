@@ -3,7 +3,7 @@
 - Remove demuxlet v1
 - use as default "taglowquality = True " in SCanSNP. But Add the possibility to include it in consensus emission e.g. **accountLowQuality** param. Ideally:
 
-Run the pipeline using **taglowquality=True** & **accountLowQuality=False** **>** Inspect Mixture model fitting plot & proportion of LowQuals **>** if needed rerun only consensus with **accountLowQuality=True** (SCanSNP will still add quality column but it won't be accounted during consensus generation)
+Run the pipeline using **taglowquality=True** & **accountLowQuality=False** (SCanSNP will still add quality column but it won't be accounted during consensus generation) **>** Inspect Mixture model fitting plot & proportion of LowQuals **>** if needed rerun only consensus with **accountLowQuality=True** (SCanSNP will add quality column use the info in consensus generation)
 
 
 
