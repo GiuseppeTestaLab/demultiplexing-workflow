@@ -613,17 +613,92 @@ IDagreementRatiosDF <- as.data.frame(IDagreementRatios)
 ```
 
 
-8 __Exporting results__
+
+8 __scDblFinder vs genetic doublets detection__
+
+```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
+  
+if (params$FilteredFeaturesPath != "None"){
+  
+mergedIDs_SoCMapped_SNG <- mergedIDs_SoCMapped
+rownames(mergedIDs_SoCMapped_SNG) <- mergedIDs_SoCMapped_SNG$barcode
+mergedIDs_SoCMapped_SNG$barcode <- NULL
+
+mergedIDs_SoCMapped_SNG[(mergedIDs_SoCMapped_SNG != "doublet") & (mergedIDs_SoCMapped_SNG != "unassigned")] <- "singlet"
+
+
+Combs <- as.data.frame(combn(Software, 2), stringsAsFactors = F)
+
+scDblCombs <- c()
+for (col in colnames(Combs)){
+  if ("scDblFinder_type" %in% c(Combs[col])[[1]]) {
+    
+    scDblCombs <-c(scDblCombs,col)
+  }
+}
+
+Combs <- Combs[scDblCombs]
+
+
+
+
+vennList <- list()
+for (i in colnames(Combs)){
+  
+  Tool1 <- Combs[[i]][1]
+  Tool2 <- Combs[[i]][2]
+  
+  combName <- paste0(Tool1,"_VS_",Tool2)
+  
+  DBLsBarcodeslists <- list()  
+  DBLsBarcodeslists[[Tool1]] = rownames(mergedIDs_SoCMapped_SNG[mergedIDs_SoCMapped_SNG[Tool1] == "doublet",])
+  DBLsBarcodeslists[[Tool2]] = rownames(mergedIDs_SoCMapped_SNG[mergedIDs_SoCMapped_SNG[Tool2] == "doublet",])
+
+
+  grid.newpage()
+  venn_object <- venn.diagram(
+          DBLsBarcodeslists,
+          category.names = c(Tool1 , Tool2 ),
+          # Circles
+          lwd = 2,
+          lty = 'blank',
+          fill = c("#E69F00", "#009E73"),
+          # Numbers
+          cex = .9,
+          fontface = "italic",
+          main = combName,
+          # Set names
+          cat.cex = 1,
+          cat.fontface = "bold",
+          cat.default.pos = "outer", 
+          filename = NULL)
+  grid.draw(venn_object)
+}
+
+
+} else {
+  print("Please provide Filtered Features path to compare genetic DBLs vs Clustering DBLs")
+}
+
+
+```
+
+
+
+9 __Exporting results__
 
 ```{r , collapse=TRUE}
 
-if (is.null(BarcodeMap)){
-  DStype <- "1"
+if (params$BarcodeMap == "None"){
+  DStype = "1"
 } else {
-  DStype <- "0"
+  DStype = "0"
+
 }
 
-DSsize <- dim(mergedIDs_SoCMapped)[1]
+
+
+DSsize = dim(mergedIDs_SoCMapped)[1]
 
 MetricsDF <- data.frame(matrix(, nrow=0, ncol=5))
 colnames(MetricsDF) <- c("Software","DBLsRate","TotalDroplets","Dataset","DStype")
@@ -633,12 +708,13 @@ IDsList <- unique(as.vector(t(mergedIDs_SoCMappedSS)))
 
 for (tool in toolsList){
   ToolDBLsRatio <- as.numeric(round(table(mergedIDs_SoCMapped[tool])["doublet"]/DSsize*100,2))
-  toolRow <- data.frame("Software"=tool, "DBLsRate"=ToolDBLsRatio, "TotalDroplets"= DSsize, "Dataset"=Dataset, "DStype"=DStype)
+  toolRow <- data.frame("Software"=tool, "DBLsRate"=ToolDBLsRatio, "TotalDroplets"= DSsize, "Dataset"=params$Dataset, "DStype"=DStype)
   toolRow <- cbind(toolRow,IDagreementRatiosDF )
   MetricsDF <- rbind(MetricsDF, toolRow)
 }
 
-tool <- "SoCID"
+
+
 
 if (DStype == "0" ){
   rownames(CorrectOverallAssignsDF) <- CorrectOverallAssignsDF$Software
@@ -663,7 +739,8 @@ if (DStype == "0" ){
   MetricsDF <- cbind(MetricsDF, countsPerToolDF)
 }
 
-write.table(MetricsDF, file=metricsFile, sep = "\t", row.names = F, col.names = T,quote = F)
+
+write.table(MetricsDF, file=params$outFile, sep = "\t", row.names = F, col.names = T,quote = F)
 
 
 ```

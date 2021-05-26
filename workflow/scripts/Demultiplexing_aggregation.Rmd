@@ -13,8 +13,8 @@ params:
 ---
 
 ```{r, collapse=TRUE}
-params$DSnames <- snakemake@params[["sample_names"]]
-params$DMXmetrices <- snakemake@input[["results_file"]]
+DSnames <- snakemake@params[["sample_names"]]
+DMXmetrices <- snakemake@input[["results_file"]]
 ```
 
 Parameters
@@ -38,6 +38,11 @@ library(stringr)
 options(stringsAsFactors = FALSE)
 ```
 
+Parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+  print(paste('Parameter: DSnames              - Value:', DSnames, '- Class:', class(DSnames)))
+  print(paste('Parameter: DMXmetrices          - Value:', DMXmetrices, '- Class:', class(DMXmetrices)))
+```
 
 
 ## __2. Non Synthetic bam aggregation data__
@@ -47,10 +52,9 @@ options(stringsAsFactors = FALSE)
 
 #Storing metrices in DF list
 
-DSlist <- params$DMXmetrices
-DSNamesList <- params$DSnames
-# DSlist <- unlist(strsplit(params$DMXmetrices,","))
-# DSNamesList <- unlist(strsplit(params$DSnames,","))
+
+DSlist <- unlist(strsplit(params$DMXmetrices,","))
+DSNamesList <- unlist(strsplit(params$DSnames,","))
 
 loadedList <- list()
 for (DS in seq(1, length(DSlist))){
@@ -64,8 +68,10 @@ for (DS in seq(1, length(DSlist))){
 #Aggregate DF and select only non-synthetics
 AggregatedDF <- bind_rows(loadedList)[bind_rows(loadedList)$DStype == 1,]
 
+dropletCountsDF <- unique(AggregatedDF[c("Dataset","TotalDroplets")])
+OrderedDS <- c(dropletCountsDF[order(dropletCountsDF$TotalDroplets),]$Dataset)
 
-AggregatedDF$Dataset <- factor(AggregatedDF$Dataset, c("Sample_S20812_258","Sample_S20813_259","Sample_S20814_260","Sample_S20272_157","Sample_S20273_158"))
+AggregatedDF$Dataset <- factor(AggregatedDF$Dataset, OrderedDS)
 
 
 
@@ -75,7 +81,7 @@ AggregatedDF$Dataset <- factor(AggregatedDF$Dataset, c("Sample_S20812_258","Samp
 ## __3. Doublets rate by total non-empty droplets software-wise__
 
 
-```{r, collapse=TRUE, fig.height=6, fig.width=6}
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
 
 AggregatedDF$DBLsRate <- round(AggregatedDF$DBLsRate/100,2)
 
@@ -194,7 +200,7 @@ LogDF$variable <- str_replace(as.character(LogDF$variable), "logCounts_", "")
 LogDF$ID_type <- as.factor(ifelse((LogDF$variable != "doublet") & (LogDF$variable != "unassigned"), "singlet", LogDF$variable))
 LogDF$ID_type <- factor(LogDF$ID_type, c("singlet","doublet","unassigned"))
 
-LogDF$Dataset <- factor(AggregatedDF$Dataset, c("Sample_S20812_258","Sample_S20813_259","Sample_S20814_260","Sample_S20272_157","Sample_S20273_158"))
+LogDF$Dataset <- factor(AggregatedDF$Dataset,OrderedDS)
 
 LogDF$variable <- as.factor(LogDF$variable)
 
@@ -231,10 +237,8 @@ p3
 
 #Storing metrices in DF list
 
-DSlist <- params$DMXmetrices
-DSNamesList <- params$DSnames
-# DSlist <- unlist(strsplit(params$DMXmetrices,","))
-# DSNamesList <- unlist(strsplit(params$DSnames,","))
+DSlist <- unlist(strsplit(params$DMXmetrices,","))
+DSNamesList <- unlist(strsplit(params$DSnames,","))
 
 loadedList <- list()
 for (DS in seq(1, length(DSlist))){
@@ -267,6 +271,3 @@ theme(axis.text.y = element_text(size = 15))+
 p4
 
 ```
-
-
-
