@@ -337,9 +337,49 @@ rule souporcell:
 # 	script:
 # 		"scripts/scDBLfinder.R"
 
+
+
+
 ###########################################################################
 
-rule scansnp:
+# rule scansnp:
+#     input:
+#         bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
+#         vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
+#         barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
+#     output:
+#         barcodesid = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
+#     container: _SINGULARITY_IMAGE
+#     threads: 10
+#     resources:
+#         time = "24:00:00",
+#         mem = "48G"
+#     log:
+#         os.path.join(demultiplexing_path,"{sample}","scansnp.log")
+#     benchmark:
+#         os.path.join(benchmark_path,"scansnp.{sample}.txt")
+#     params:
+#         outdir = lambda wildcards, output: os.path.dirname(output.barcodesid),
+#         scratch_dir = config["scratchpath"]
+#     shell:
+#         """
+#         # activate conda environment with SCanSNP requirements, saving the env options to file
+#         TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-activate_conda.sh)
+#         conda shell.zsh hook > $TMPFILE
+#         set +u; source $TMPFILE; conda activate scansnp; set -u
+#         # run SCanSNP
+#         python /usr/local/SCanSNP/SCanSNP/SCanSNP.py \
+#                --threads {threads} \
+#                --bam {input.bam} \
+#                --barcodes {input.barcodes} \
+#                --vcf {input.vcf} \
+#                --outdir {params.outdir} >& {log}
+#         # clean up conda file
+#         rm $TMPFILE
+#         """
+
+
+rule scansnp_MOD:
     input:
         bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
         vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
@@ -347,10 +387,10 @@ rule scansnp:
     output:
         barcodesid = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
     container: _SINGULARITY_IMAGE
-    threads: 10
+    threads: 5
     resources:
         time = "24:00:00",
-        mem = "48G"
+        mem = "4G"
     log:
         os.path.join(demultiplexing_path,"{sample}","scansnp.log")
     benchmark:
@@ -365,9 +405,10 @@ rule scansnp:
         conda shell.zsh hook > $TMPFILE
         set +u; source $TMPFILE; conda activate scansnp; set -u
         # run SCanSNP
-        python /usr/local/SCanSNP/SCanSNP/SCanSNP.py \
+        python /hpcnfs/scratch/temporary/Dav_vc/20.4_DemultiMatteo/SCanSNP_V1_ssh/SCanSNP/SCanSNP/SCanSNP.py \
                --threads {threads} \
                --bam {input.bam} \
+               --flagLowQual True \
                --barcodes {input.barcodes} \
                --vcf {input.vcf} \
                --outdir {params.outdir} >& {log}
