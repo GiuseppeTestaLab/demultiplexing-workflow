@@ -45,16 +45,21 @@ benchmark_path = os.path.join(config["datapath"], "scRNAseq", "benchmarks", set_
 # the following is a temporary path where intermediate BAM files are written
 processing_path = os.path.join(config["datapath"], "scRNAseq", "tmp_" + set_id + "_" + username)
 
+
 # define list of final count files
 sample_list = list(inputdata["samples"].keys())
 demult_files = []
 for sample in sample_list:
-    demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v1', '{}.best'.format(sample)))
+    #demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v1', '{}.best'.format(sample)))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v2', '{}.best'.format(sample)))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'vireo', 'vireo_out', 'donor_ids.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'souporcell', 'clusters.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'scansnp', 'Cell_IDs.tsv'))
     demult_files.append(os.path.join(report_path, sample + '_demultiplexing.html'))
+    if inputdata["samples"][sample]["filteredmatrix"] is not None:
+        demult_files.append(os.path.join(demultiplexing_path, sample, 'dropkick', 'dropkick_class.tsv'))
+        demult_files.append(os.path.join(demultiplexing_path, sample, 'scdblfinder', 'barcodesclass.tsv'))
+
 
 ###########################################################################
 
@@ -111,7 +116,7 @@ rule demuxlet_v1:
         
         # compute the number of cells and a required parameter
         NCELLS=`cat $TMPFILE | wc -l`
-        DBLPRIOR=`python -c "print('%.3f' % ($NCELLS/13000.))"`
+        DBLPRIOR=`python -c "print('%.3f' % ($NCELLS/130000.))"`
         echo $DBLPRIOR > {params.outdir}/dbl_prior.txt
 
         # run demuxlet
@@ -161,16 +166,13 @@ rule demuxlet_v2:
         
         # compute the number of cells and a required parameter
         NCELLS=`cat $TMPFILE | wc -l`
-        DBLPRIOR=`python -c "print('%.3f' % ($NCELLS/13000.))"`
-        echo $DBLPRIOR > {params.outdir}/dbl_prior.txt
 
         # run demuxlet
         popscle demuxlet --sam {input.bam} \
                          --vcf {input.vcf} \
                          --out {params.outdir}/{wildcards.sample} \
                          --field {params.field} \
-                         --group-list $TMPFILE \
-                         --doublet-prior $DBLPRIOR >& {log}
+                         --group-list $TMPFILE  >& {log}
                  
         # remove temporary file
         rm $TMPFILE                         
@@ -186,10 +188,10 @@ rule cellsnp:
     output:
         out = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'cellSNP_out', 'cellSNP.samples.tsv')
     container: _SINGULARITY_IMAGE
-    threads: 10
+    threads: 5
     resources:
         time = "18:00:00",
-        mem = "32G"
+        mem = "16G"
     log:
         os.path.join(demultiplexing_path, "{sample}", "vireo_1.log")
     benchmark:
@@ -230,10 +232,10 @@ rule vireo:
     output:
         out = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv')
     container: _SINGULARITY_IMAGE
-    threads: 10
+    threads: 5
     resources:
         time = "18:00:00",
-        mem = "32G"
+        mem = "16G"
     log:
         os.path.join(demultiplexing_path,"{sample}","vireo_2.log")
     benchmark:
@@ -299,6 +301,7 @@ rule souporcell:
     shell:
         """
         # copy and unzip, if needed, the file with the cell barcodes 
+        mkdir -p {params.scratch_dir}
         TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-barcodes.tsv)
         if [ {params.barcodes_ext} = ".tsv" ]; then
             cat {input.barcodes} > $TMPFILE
@@ -321,6 +324,59 @@ rule souporcell:
 
 ###########################################################################
 
+
+#---Singularity container is hardcoded, need to include scDBlfinder in final image
+
+rule scDblFinder:
+	input:
+		filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'] if inputdata['samples'][wildcards.sample]['filteredmatrix'] is not None else []
+	output:
+		barcodesclass = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder', 'barcodesclass.tsv')
+	singularity:
+		"/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
+	log:
+		os.path.join(demultiplexing_path,"{sample}","scdblfinder.log")
+	resources:
+		time="2:00:00",
+		mem="4G"
+	params:
+		scDblFinderpath = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder')
+	script:
+		"scripts/scDBLfinder.R"
+
+
+
+
+###########################################################################
+
+
+#---Singularity container is hardcoded, need to include scDBlfinder in final image
+
+rule dropkick:
+	input:
+		filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'] if inputdata['samples'][wildcards.sample]['filteredmatrix'] is not None else []
+	output:
+		dropkickOut = os.path.join(demultiplexing_path, "{sample}", 'dropkick', 'dropkick_class.tsv')
+	singularity:
+		"/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
+	threads: 5
+	resources:
+		time="20:00:00",
+		mem="32G"
+	log:
+		os.path.join(demultiplexing_path,"{sample}","dropkick.log")
+	params:
+		nprocs =  10,
+		dropkickpath = os.path.join(demultiplexing_path, "{sample}", 'dropkick')
+	script:
+		"scripts/dropkick.py"
+
+
+###########################################################################
+
+
+
+
 rule scansnp:
     input:
         bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
@@ -328,11 +384,11 @@ rule scansnp:
         barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
     output:
         barcodesid = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
-    container: _SINGULARITY_IMAGE
-    threads: 10
+    container: "/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
+    threads: 5
     resources:
         time = "24:00:00",
-        mem = "48G"
+        mem = "6G"
     log:
         os.path.join(demultiplexing_path,"{sample}","scansnp.log")
     benchmark:
@@ -343,11 +399,12 @@ rule scansnp:
     shell:
         """
         # activate conda environment with SCanSNP requirements, saving the env options to file
+        mkdir -p {params.scratch_dir}
         TMPFILE=$(mktemp {params.scratch_dir}/$USER-XXXXXX-activate_conda.sh)
         conda shell.zsh hook > $TMPFILE
         set +u; source $TMPFILE; conda activate scansnp; set -u
         # run SCanSNP
-        python /usr/local/SCanSNP/SCanSNP/SCanSNP.py \
+        python /hpcnfs/scratch/temporary/Dav_vc/20.4_DemultiMatteo/SCanSNP_V1_ssh_EmptyFit/SCanSNP/SCanSNP/SCanSNP.py \
                --threads {threads} \
                --bam {input.bam} \
                --barcodes {input.barcodes} \
@@ -365,10 +422,10 @@ rule sample_report:
         demuxlet_v2 = os.path.join(demultiplexing_path,'{sample}','demuxlet_v2','{sample}.best'),
         soc = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'clusters.tsv'),
         vireo = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv'),
-        scansnp = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
+        scansnp = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv'),
     output:
-        html =  os.path.join(report_path, "{sample}" + '_demultiplexing.html')
-    container: _SINGULARITY_IMAGE
+        html =  os.path.join(report_path, "{sample}" + '_demultiplexing.html'),
+    container: "/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
     threads: 1
     resources:
         time = "6:00:00",
@@ -380,9 +437,13 @@ rule sample_report:
         filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'],
         barcode_map = lambda wildcards: inputdata['samples'][wildcards.sample]['referencecall'],
         demult_metrics = os.path.join(report_path, "{sample}", 'demultiplexing_metrics.tsv'),
-        combined_results = os.path.join(report_path, "{sample}", 'combined_calls.tsv')
+        aggregatedCall = os.path.join(demultiplexing_path, "{sample}", 'aggregatedCall', 'aggregatedCall.tsv'),
+        aggregatedCalldir = os.path.join(demultiplexing_path, "{sample}", 'aggregatedCall'),
+        dropkick = os.path.join(demultiplexing_path, "{sample}", 'dropkick', 'dropkick_class.tsv') if inputdata["samples"][sample]["filteredmatrix"] is not None else None,
+        scDblFinder = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder', 'barcodesclass.tsv') if inputdata["samples"][sample]["filteredmatrix"] is not None else None
     script:
         "scripts/Demultiplexing_report.Rmd"
+
 
 ###########################################################################
 

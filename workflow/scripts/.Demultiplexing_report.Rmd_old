@@ -9,40 +9,29 @@ output:
     code_folding: hide
 params:
     rmd: NULL
-    dataset: NULL
+    Dataset: NULL
     Demuxlet_V1: NULL
     Demuxlet_V2: NULL
     SoC: NULL
     Vireo: NULL
     SCanSNP: NULL
-    dropkick: NULL
-    scDblFinder: NULL
     BarcodeMap: NULL
     FilteredFeaturesPath: NULL
     metricsFile: NULL
-    aggregatedCall: NULL
+    callsFile: NULL
 ---
 
 ```{r, collapse=TRUE}
-
-
-
-
-
 Dataset <- snakemake@params[["dataset"]]
-Demuxlet_V1_path <- snakemake@input[["demuxlet_v1"]]
-Demuxlet_path <- snakemake@input[["demuxlet_v2"]]
-SoC_path <- snakemake@input[["soc"]]
-Vireo_path <- snakemake@input[["vireo"]]
-SCanSNP_path <- snakemake@input[["scansnp"]]
-dropkick_path <- snakemake@params[["dropkick"]]
-scDblFinder_path <- snakemake@params[["scDblFinder"]]
+Demuxlet_V1 <- snakemake@input[["demuxlet_v1"]]
+Demuxlet_V2 <- snakemake@input[["demuxlet_v2"]]
+SoC <- snakemake@input[["soc"]]
+Vireo <- snakemake@input[["vireo"]]
+SCanSNP <- snakemake@input[["scansnp"]]
 BarcodeMap <- snakemake@params[["barcode_map"]]
 FilteredFeaturesPath <- snakemake@params[["filtered_matrix"]]
 metricsFile <- snakemake@params[["demult_metrics"]]
-aggregatedCall <- snakemake@params[["aggregatedCall"]]
-aggregatedCalldir <- snakemake@params[["aggregatedCalldir"]]
-
+callsFile <- snakemake@params[["combined_results"]]
 ```
 ####  Analysis is performed on `r Dataset`.
 
@@ -58,17 +47,24 @@ library(stringr)
 library(gridExtra)
 library(grid)
 library(Seurat)
-library(VennDiagram)
-
 
 options(stringsAsFactors = FALSE)
-
-dir.create(file.path(aggregatedCalldir), showWarnings = FALSE)
-
 ```
 
 
-
+Parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+  print(paste('Parameter: Dataset              - Value:', Dataset, '- Class:', class(Dataset)))
+  print(paste('Parameter: Demuxlet_V1          - Value:', Demuxlet_V1, '- Class:', class(Demuxlet_V1)))
+  print(paste('Parameter: Demuxlet_V2          - Value:', Demuxlet_V2, '- Class:', class(Demuxlet_V2)))
+  print(paste('Parameter: SoC                  - Value:', SoC, '- Class:', class(SoC)))
+  print(paste('Parameter: Vireo                - Value:', Vireo, '- Class:', class(Vireo)))
+  print(paste('Parameter: SCanSNP              - Value:', SCanSNP, '- Class:', class(SCanSNP)))
+  print(paste('Parameter: BarcodeMap           - Value:', BarcodeMap, '- Class:', class(BarcodeMap)))
+  print(paste('Parameter: FilteredFeaturesPath - Value:', FilteredFeaturesPath, '- Class:', class(FilteredFeaturesPath)))
+  print(paste('Parameter: metricsFile          - Value:', metricsFile, '- Class:', class(metricsFile)))
+  print(paste('Parameter: callsFile            - Value:', callsFile, '- Class:', class(callsFile)))
+```
 
 ****
 
@@ -79,79 +75,51 @@ dir.create(file.path(aggregatedCalldir), showWarnings = FALSE)
  * Demuxlet V1
  * Demuxlet V2
  * SCanSnp
- * scDblFinder
-
 
 
 ```{r ReadData,, collapse=TRUE}
 # SoC
-SoC <- read.csv(SoC_path, header = T, sep = "\t",stringsAsFactors=F)
+SoC <- read.csv(SoC, header = T, sep = "\t", stringsAsFactors=F)
 SoC$SoCID <- ifelse(SoC$status == "singlet", SoC$assignment, SoC$status)
 
 # Vireo
-Vireo <- read.csv(Vireo_path, header = T, sep = "\t",stringsAsFactors=F) %>% dplyr::rename(barcode=cell, VireoID=donor_id)
+Vireo <- read.csv(Vireo, header = T, sep = "\t", stringsAsFactors=F) %>%
+         dplyr::rename(barcode=cell, VireoID=donor_id)
 Vireo <-  Vireo[,c("barcode","VireoID")]
 
 # Demuxlet V1
-Demuxlet_V1 <- read.csv(Demuxlet_V1_path, header = T, sep = "\t",stringsAsFactors=F) %>% dplyr::rename(barcode=BARCODE) %>%
-  tidyr::separate(BEST, c('dbltype', 'first','second'), sep="-")
+Demuxlet_V1 <- read.csv(Demuxlet_V1, header = T, sep = "\t", stringsAsFactors=F) %>%
+               dplyr::rename(barcode=BARCODE) %>%
+               tidyr::separate(BEST, c('dbltype', 'first','second'), sep="-")
 Demuxlet_V1$Demuxlet_V1_BEST <- ifelse(Demuxlet_V1$dbltype != "SNG", Demuxlet_V1$dbltype, Demuxlet_V1$first)
-Demuxlet_V1[Demuxlet_V1=="DBL"]<-"doublet"
-Demuxlet_V1[Demuxlet_V1=="AMB"]<-"unassigned"
+Demuxlet_V1[Demuxlet_V1=="DBL"] <- "doublet"
+Demuxlet_V1[Demuxlet_V1=="AMB"] <- "unassigned"
 
-
-# Demuxlet V2 (henceforth Demuxlet.)
-Demuxlet <- read.csv(Demuxlet_path, header = T, sep = "\t",stringsAsFactors=F)  %>% dplyr::rename(barcode=BARCODE) %>%
-  tidyr::separate(BEST.GUESS, c('BEST.GUESS_1', 'BEST.GUESS_2','Prop'), sep=",")
-Demuxlet$Demuxlet_BEST <- ifelse(Demuxlet$DROPLET.TYPE != "SNG", Demuxlet$DROPLET.TYPE, Demuxlet$BEST.GUESS_1)
-Demuxlet[Demuxlet=="DBL"]<-"doublet"
-Demuxlet[Demuxlet=="AMB"]<-"unassigned"
+# Demuxlet V2
+Demuxlet_V2 <- read.csv(Demuxlet_V2, header = T, sep = "\t", stringsAsFactors=F)  %>%
+               dplyr::rename(barcode=BARCODE) %>%
+               tidyr::separate(BEST.GUESS, c('BEST.GUESS_1', 'BEST.GUESS_2', 'Prop'), sep=",")
+Demuxlet_V2$Demuxlet_V2_BEST <- ifelse(Demuxlet_V2$DROPLET.TYPE != "SNG", Demuxlet_V2$DROPLET.TYPE, Demuxlet_V2$BEST.GUESS_1)
+Demuxlet_V2[Demuxlet_V2=="DBL"] <- "doublet"
+Demuxlet_V2[Demuxlet_V2=="AMB"] <- "unassigned"
 
 # ScanSnp
-Scansnp <- read.csv(SCanSNP_path, sep = "\t", header = T,stringsAsFactors=F) %>% dplyr::rename(SCanSNPID=ID)
+Scansnp <- read.csv(SCanSNP, sep = "\t", header = T, stringsAsFactors=F) %>%
+           dplyr::rename(barcode=X, SCanSNPID=ID)
 Scansnp$SCanSNPID[Scansnp$SCanSNPID == "notclassified"] <- "unassigned"
-Scansnp[Scansnp=="Doublet"]<-"doublet"
-
-# scdblfinder
-if (!is.null(FilteredFeaturesPath)){
-  scDblFinder <- read.csv(scDblFinder_path, sep = "\t", header = F,stringsAsFactors=F,
-  col.names=c("barcode","scDblFinder_type"))
-}
-
-
-#dropkick
-if (!is.null(FilteredFeaturesPath)){
-  dropkick <- read.csv(dropkick_path, sep = "\t", header = T,stringsAsFactors=F)
-}
-
-
+Scansnp$SCanSNPID[Scansnp$SCanSNPID == "Doublet"] <- "doublet"
 ```
 
 
 
 ```{r MergeData, collapse=TRUE}
-
-if (!is.null(FilteredFeaturesPath)){
 mergedIDs <- dplyr::select(SoC, c("barcode","SoCID"))  %>%
-  dplyr::inner_join(dplyr::select(Demuxlet_V1, c("barcode","Demuxlet_V1_BEST")),  by = "barcode") %>%
-  dplyr::inner_join(dplyr::select(Vireo, c("barcode","VireoID")),  by = "barcode") %>%
-  dplyr::inner_join(dplyr::select(Scansnp, c("barcode","SCanSNPID")),  by = "barcode") %>%
-    dplyr::inner_join(dplyr::select(Demuxlet, c("barcode","Demuxlet_BEST")), by = "barcode") %>%
-    dplyr::inner_join(dplyr::select(scDblFinder, c("barcode","scDblFinder_type")), by = "barcode") %>%
-      dplyr::inner_join(dplyr::select(dropkick, c("barcode","dropkick_label_03")), by = "barcode")
-  } else {
-  mergedIDs <- dplyr::select(SoC, c("barcode","SoCID"))  %>%
-    dplyr::inner_join(dplyr::select(Demuxlet_V1, c("barcode","Demuxlet_V1_BEST")),  by = "barcode") %>%
-    dplyr::inner_join(dplyr::select(Vireo, c("barcode","VireoID")),  by = "barcode") %>%
-    dplyr::inner_join(dplyr::select(Scansnp, c("barcode","SCanSNPID")),  by = "barcode") %>%
-      dplyr::inner_join(dplyr::select(Demuxlet, c("barcode","Demuxlet_BEST")), by = "barcode")
-  }
-#head(mergedIDs)
+             dplyr::inner_join(dplyr::select(Demuxlet_V1, c("barcode","Demuxlet_V1_BEST")),  by = "barcode") %>%
+             dplyr::inner_join(dplyr::select(Vireo, c("barcode","VireoID")),  by = "barcode") %>%
+             dplyr::inner_join(dplyr::select(Scansnp, c("barcode","SCanSNPID")),  by = "barcode") %>%
+             dplyr::inner_join(dplyr::select(Demuxlet_V2, c("barcode","Demuxlet_V2_BEST")), by = "barcode")
 
-#mergedIDs  <- merge(SoC, Demuxlet_V1,by = "barcode")
-#mergedIDs  <- merge(mergedIDs, Vireo ,by = "barcode")
-#mergedIDs  <- merge(mergedIDs, Scansnp ,by = "barcode")
-#mergedIDs  <- merge(mergedIDs, Demuxlet ,by = "barcode")
+write.table(mergedIDs, file=callsFile, sep = "\t", row.names = F, col.names = T,quote = F)
 ```
 
 
@@ -169,7 +137,7 @@ round(prop.table(table(mergedIDs$Demuxlet_V1_BEST))*100, 2)
 ```
 
 ```{r, collapse=TRUE, fig.height=6, fig.width=6}
-DemTypeDF <- data.frame("dblType" = factor(ifelse((mergedIDs$Demuxlet_V1_BEST != "doublet") & (mergedIDs$Demuxlet_V1_BEST != "unassigned"), "singlet", mergedIDs$Demuxlet_V1_BEST)))
+DemTypeDF <- data.frame("dblType" = factor(ifelse((mergedIDs$Demuxlet_V1 != "doublet") & (mergedIDs$Demuxlet_V1 != "unassigned"), "singlet", mergedIDs$Demuxlet_V1)))
 
 DemType <- ggplot(data=DemTypeDF, aes(x=dblType, fill=dblType)) +
   geom_bar(alpha=0.65) +
@@ -190,13 +158,13 @@ DemType
 ### 3.1b __Demuxlet V2: Frequency of doublets__
 
 ```{r, collapse=TRUE}
-table(mergedIDs$Demuxlet_BEST)["doublet"]
-round(prop.table(table(mergedIDs$Demuxlet_BEST))*100, 2)
+table(mergedIDs$Demuxlet_V2_BEST)["doublet"]
+round(prop.table(table(mergedIDs$Demuxlet_V2_BEST))*100, 2)
 
 ```
 
 ```{r, collapse=TRUE, fig.height=6, fig.width=6}
-DemTypeV2DF <- data.frame("dblType" = factor(ifelse((mergedIDs$Demuxlet_BEST != "doublet") & (mergedIDs$Demuxlet_BEST != "unassigned"), "singlet", mergedIDs$Demuxlet_BEST)))
+DemTypeV2DF <- data.frame("dblType" = factor(ifelse((mergedIDs$Demuxlet_V2 != "doublet") & (mergedIDs$Demuxlet_V2 != "unassigned"), "singlet", mergedIDs$Demuxlet_V2)))
 
 DemTypeV2 <- ggplot(data=DemTypeV2DF, aes(x=dblType, fill=dblType)) +
   geom_bar(alpha=0.65) +
@@ -210,8 +178,8 @@ DemTypeV2
 ```
 
 
-##### The percentage of __doublets__ detected __by Demuxlet V2 is `r round(table(mergedIDs$Demuxlet_BEST)["doublet"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
-##### The percentage of __unassigned__ detected __by Demuxlet V2 is `r round(table(mergedIDs$Demuxlet_BEST)["unassigned"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### The percentage of __doublets__ detected __by Demuxlet V2 is `r round(table(mergedIDs$Demuxlet_V2_BEST)["doublet"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
+##### The percentage of __unassigned__ detected __by Demuxlet V2 is `r round(table(mergedIDs$Demuxlet_V2_BEST)["unassigned"]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)`__
 ##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
 
 
@@ -300,49 +268,6 @@ ScansnpType
 ##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
 
 
-### 3.5 __scDblFinder: Frequency of doublets__
-
-```{r, collapse=TRUE}
-
-if (!is.null(FilteredFeaturesPath)){
-table(mergedIDs$scDblFinder_type)["doublet"]
-round(prop.table(table(mergedIDs$scDblFinder_type))*100, 2)
-}
-
-```
-
-```{r, collapse=TRUE, fig.height=4.5, fig.width=8}
-if (!is.null(FilteredFeaturesPath)){
-scDblFinderDF <- data.frame("dblType" = factor(ifelse((mergedIDs$scDblFinder_type != "doublet") & (mergedIDs$scDblFinder_type != "unassigned"), "singlet", mergedIDs$scDblFinder_type)))
-
-scDblFinder <- ggplot(data=scDblFinderDF, aes(x=dblType, fill=dblType)) +
-  geom_bar(alpha=0.65) +
-  geom_text(stat='count', aes(label=..count..), vjust=1.2) +
-  ggtitle('scDblFinde: Doublet Number') + ylab('Droplet Number') + xlab('Droplet Type') +
-  scale_fill_hue(h=c(0, 120)) +
-  theme_bw()
-
-
-scDblFinder
-}
-
-
-```
-
-```{r, collapse=TRUE}
-if (!is.null(FilteredFeaturesPath)){
-  DBLpercentage <- round(table(mergedIDs$scDblFinder_type)["doublet"][[1]]/dim(mergedIDs)[1]*100,2) %>% replace_na(0)
-  message <- paste0("The percentage of doublets detected by scDblFinder is ", as.character(DBLpercentage))
-}else{
-  message <- "Please provide Filtered Features path to Detect doublets via scDblFinder"
-}
-```
-
-
-##### `r message`
-##### Total __non empty droplets__ in experiment is  __`r dim(mergedIDs)[1]`__
-
-
 ****
 
 ## __4. Identity Assignment__
@@ -355,7 +280,7 @@ if (!is.null(FilteredFeaturesPath)){
 Names <- as.vector(unique(mergedIDs$SoCID))
 SoCNoDBLs <- Names[Names != "doublet" & Names != "unassigned" ]
 
-DMX_IDs <- as.vector(unique(mergedIDs$Demuxlet_BEST)[(unique(mergedIDs$Demuxlet_BEST) != "doublet" & unique(mergedIDs$Demuxlet_BEST) != "unassigned")])
+DMX_IDs <- as.vector(unique(mergedIDs$Demuxlet_V2_BEST)[(unique(mergedIDs$Demuxlet_V2_BEST) != "doublet" & unique(mergedIDs$Demuxlet_V2_BEST) != "unassigned")])
 
 
 combinations <- permn(DMX_IDs)
@@ -372,9 +297,9 @@ for(combination in seq(length(combinations))){
         mergedIDs_temp$SoCID[mergedIDs_temp$SoCID==SoCNoDBLs[[pos]]] <- CombTemp[[pos]]
 
     if (pos == length(CombTemp)){
-      if (length(which(mergedIDs_temp$SoCID == mergedIDs_temp$Demuxlet_BEST)) > BestCombOverlap){
+      if (length(which(mergedIDs_temp$SoCID == mergedIDs_temp$Demuxlet_V2_BEST)) > BestCombOverlap){
         mergedIDs_SoCMapped <- mergedIDs_temp
-        BestCombOverlap <- length(which(mergedIDs_temp$SoCID == mergedIDs_temp$Demuxlet_BEST))
+        BestCombOverlap <- length(which(mergedIDs_temp$SoCID == mergedIDs_temp$Demuxlet_V2_BEST))
         SoCMappings <- list("SoCClusters"=SoCNoDBLs, "Mappings"=SoCNoDBLs_temp)
 
       }
@@ -410,8 +335,9 @@ for (tool in Software){
 
 ggplot(data=IDdf, aes(x=Software, y=Cells, fill=ID)) +
   geom_bar(stat="identity", color="black",position=position_dodge())+
+  scale_fill_brewer(palette="Dark2")+
   theme_minimal()+
-  theme(axis.text.x = element_text(size =  15,angle = 90), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20))
+  theme(axis.text.x = element_text(size =  15), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20))
 
 
 
@@ -428,7 +354,7 @@ mosaicplot(~ Demuxlet_V1_BEST + SoCID , data = mergedIDs_SoCMapped, col=c("darko
 ```
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
-mosaicplot(~ Demuxlet_BEST + SoCID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "SoC clusters - Demuxlet overlaps", las=2)
+mosaicplot(~ Demuxlet_V2_BEST + SoCID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "SoC clusters - Demuxlet overlaps", las=2)
 ```
 
 
@@ -436,14 +362,14 @@ mosaicplot(~ Demuxlet_BEST + SoCID , data = mergedIDs_SoCMapped, col=c("darkoliv
 
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
-mosaicplot(~ Demuxlet_BEST + VireoID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "Vireo - Demuxlet  overlaps", las=2)
+mosaicplot(~ Demuxlet_V2_BEST + VireoID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = "Vireo - Demuxlet  overlaps", las=2)
 ```
 
 #### 4.2.3 __Demuxlet vs ScanSnp__
 
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 7.5, fig.width = 7.5}
-mosaicplot(~ Demuxlet_BEST + SCanSNPID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = " SCanSNP - Demuxlet  overlaps", las=2)
+mosaicplot(~ Demuxlet_V2_BEST + SCanSNPID , data = mergedIDs_SoCMapped, col=c("darkolivegreen1", "darkgoldenrod1", "brown1", "darkorchid4", "cadetblue4","cyan2", "deepskyblue"), main = " SCanSNP - Demuxlet  overlaps", las=2)
 ```
 
 
@@ -475,8 +401,8 @@ mosaicplot(~ SCanSNPID + SoCID , data = mergedIDs_SoCMapped, col=c("darkolivegre
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
 
-Software_no_scDBLFinder <- Software[!Software %in% c("scDblFinder_type")]
-SoftwareComb <- as.data.frame(combn(Software_no_scDBLFinder, 2), stringsAsFactors = F)
+
+SoftwareComb <- as.data.frame(combn(Software, 2), stringsAsFactors = F)
 
 AgreementDF <- data_frame()
 for (i in colnames(SoftwareComb)){
@@ -489,7 +415,6 @@ for (i in colnames(SoftwareComb)){
 }
 
 
-
 AgreementDF <- arrange(AgreementDF, AgreementRatio)
 AgreementDF$Software <- factor(AgreementDF$Software, levels = AgreementDF$Software)
 
@@ -497,17 +422,17 @@ AgreementDF$Software <- factor(AgreementDF$Software, levels = AgreementDF$Softwa
 
 ggplot(data=AgreementDF, aes(x=Software, y = AgreementRatio,fill=Software)) +
   geom_bar(stat="identity", color="black",position=position_dodge())+
+  scale_fill_brewer(palette="Set3")+
   theme_minimal()+
   coord_flip()+ theme(legend.position = "none")+
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 10))+
   theme(axis.text.x = element_text(size =  15), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20))
 
 
-
 ```
 
 
-## 5 __Counts Plot__
+### 5 __Counts Plot__
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 40, fig.width = 16}
 
@@ -516,16 +441,13 @@ if (!is.null(FilteredFeaturesPath)){
   par(mfrow=c(5,1))
 
   sc.data <- Read10X(data.dir = FilteredFeaturesPath)
-  SeuratObject <- CreateSeuratObject(counts = sc.data)
+  SeuratObject <- CreateSeuratObject(counts = sc.data$`Gene Expression`)
   rownames(mergedIDs_SoCMapped) <- mergedIDs_SoCMapped$barcode
   SeuratObject[["SoCID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SoCID"]
   SeuratObject[["Demuxlet_V1_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V1_BEST"]
   SeuratObject[["VireoID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "VireoID"]
   SeuratObject[["SCanSNPID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SCanSNPID"]
-  SeuratObject[["Demuxlet_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_BEST"]
-  SeuratObject[["scDblFinder_type"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "scDblFinder_type"]
-  SeuratObject[["dropkick_label_03"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "dropkick_label_03"]
-
+  SeuratObject[["Demuxlet_V2_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V2_BEST"]
   SeuratObject$log_counts <- log10(SeuratObject$nCount_RNA+1)
 
 plotList <- list()
@@ -533,9 +455,7 @@ plotList[["SoCIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group
 plotList[["Demuxlet_V1_BESTplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "Demuxlet_V1_BEST", pt.size = 0.5)+ labs(title = "Demuxlet_V1 IDs")
 plotList[["VireoIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "VireoID", pt.size = 0.5)+ labs(title = "Vireo IDs")
 plotList[["SCanSNPIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "SCanSNPID", pt.size = 0.5)+ labs(title = "SCanSNP IDs")
-plotList[["Demuxlet_BESTplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "Demuxlet_BEST", pt.size = 0.5)+ labs(title = "Demuxlet IDs")
-plotList[["scDblFinder_typeplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "scDblFinder_type", pt.size = 0.5)+ labs(title = "scDblFinder_type IDs")
-plotList[["dropkick"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "dropkick_label_03", pt.size = 0.5)+ labs(title = "dropkick type")
+plotList[["Demuxlet_V2_BESTplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "Demuxlet_V2_BEST", pt.size = 0.5)+ labs(title = "Demuxlet_V2 IDs")
 
 CombinePlots(plotList, ncol = 1, legend = NULL)
 
@@ -553,9 +473,8 @@ print("Please provide Filtered Features path for counts plot across IDs")
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
 
-if (!is.null(BarcodeMap)){
 
-  BarcodeMap <- BarcodeMap
+if (!is.null(BarcodeMap)){
 
   accuracyPlotList <- list()
   SynthReferences <- read.csv(BarcodeMap, header = T, sep = "\t", stringsAsFactors = F , col.names = c("barcode","DBLstatus","ID"))
@@ -662,10 +581,9 @@ print("Please provide BarcodeMap to assess the Deconvolution accuracy ")
 ```
 
 
-### 7 __Best Agreement metrices calculation__
+7 __Best Agreement metrices calculation__
 
 ```{r , collapse=TRUE}
-
 
 AgreementDF_noDv1 <- AgreementDF[grep("Demuxlet_V1_BEST", AgreementDF$Software, invert=TRUE),]
 bestComb <- unlist(strsplit(as.character(AgreementDF_noDv1[order(AgreementDF_noDv1$AgreementRatio, decreasing = TRUE),"Software"][1]), "_VS_"))
@@ -692,16 +610,15 @@ IDagreementRatios[["shared_overall"]] <- round(as.numeric(AgreementDF_noDv1[orde
 IDagreementRatios[["best_agreement"]] <- as.character(AgreementDF_noDv1[order(AgreementDF_noDv1$AgreementRatio, decreasing = TRUE),"Software"][1])
 IDagreementRatiosDF <- as.data.frame(IDagreementRatios)
 
-
 ```
 
 
-### 8 __scDblFinder vs genetic doublets detection__
+
+8 __scDblFinder vs genetic doublets detection__
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
   
-
-if (!is.null(FilteredFeaturesPath)){
+if (params$FilteredFeaturesPath != "None"){
   
 mergedIDs_SoCMapped_SNG <- mergedIDs_SoCMapped
 rownames(mergedIDs_SoCMapped_SNG) <- mergedIDs_SoCMapped_SNG$barcode
@@ -768,17 +685,16 @@ for (i in colnames(Combs)){
 
 
 
-## 9 __Exporting results__
+9 __Exporting results__
 
 ```{r , collapse=TRUE}
 
-if (is.null(BarcodeMap)){
+if (params$BarcodeMap == "None"){
   DStype = "1"
 } else {
   DStype = "0"
 
 }
-
 
 
 
@@ -792,7 +708,7 @@ IDsList <- unique(as.vector(t(mergedIDs_SoCMappedSS)))
 
 for (tool in toolsList){
   ToolDBLsRatio <- as.numeric(round(table(mergedIDs_SoCMapped[tool])["doublet"]/DSsize*100,2))
-  toolRow <- data.frame("Software"=tool, "DBLsRate"=ToolDBLsRatio, "TotalDroplets"= DSsize, "Dataset"=Dataset, "DStype"=DStype)
+  toolRow <- data.frame("Software"=tool, "DBLsRate"=ToolDBLsRatio, "TotalDroplets"= DSsize, "Dataset"=params$Dataset, "DStype"=DStype)
   toolRow <- cbind(toolRow,IDagreementRatiosDF )
   MetricsDF <- rbind(MetricsDF, toolRow)
 }
@@ -824,254 +740,7 @@ if (DStype == "0" ){
 }
 
 
-write.table(MetricsDF, file=metricsFile, sep = "\t", row.names = F, col.names = T,quote = F)
+write.table(MetricsDF, file=params$outFile, sep = "\t", row.names = F, col.names = T,quote = F)
 
-
-```
-
-
-
-
-## 10 __Multi call TSV preparation__
-
-```{r , collapse=TRUE}
-
-
-# SoC
-
-if (!is.null(FilteredFeaturesPath)){
-SoCSS <- read.csv(SoC_path, header = T, sep = "\t",stringsAsFactors=F)[,c("barcode","status","assignment")]
-colnames(SoCSS) <- c("barcode","SoC_status","assignment")
-SoCSS <- SoCSS %>% tidyr::separate(assignment, c('SoC_FirstID', 'SoC_SecondID'), sep="/")
-SoCSS$SoC_FirstID <- plyr::mapvalues(SoCSS$SoC_FirstID, from = mappingsDF$SoCClusters , to = mappingsDF$Mappings)
-SoCSS$SoC_SecondID <- plyr::mapvalues(SoCSS$SoC_SecondID, from = mappingsDF$SoCClusters , to = mappingsDF$Mappings)
-
-
-
-# Vireo
-VireoSS <- read.csv(Vireo_path, header = T, sep = "\t",stringsAsFactors=F) %>% dplyr::rename(barcode=cell, VireoID=donor_id)
-VireoSS <-  VireoSS[,c("barcode","VireoID","best_singlet")]
-colnames(VireoSS) <- c("barcode","Vireo_ID","Vireo_best_singlet")
-
-
-
-
-# Demuxlet V2
-DemuxletSS <- read.csv(Demuxlet_path, header = T, sep = "\t",stringsAsFactors=F)  %>% dplyr::rename(barcode=BARCODE) %>%
-  tidyr::separate(BEST.GUESS, c('Demuxlet_FirstID', 'Demuxlet_SecondID','Prop'), sep=",")
-#Demuxlet$Demuxlet_BEST <- ifelse(Demuxlet$DROPLET.TYPE != "SNG", Demuxlet$DROPLET.TYPE, Demuxlet$BEST.GUESS_1)
-DemuxletSS[DemuxletSS=="DBL"]<-"doublet"
-DemuxletSS[DemuxletSS=="AMB"]<-"unassigned"
-DemuxletSS[DemuxletSS=="SNG"]<-"singlet"
-DemuxletSS <- DemuxletSS[,c("barcode","DROPLET.TYPE", "Demuxlet_FirstID", "Demuxlet_SecondID")] %>% dplyr::rename(Demuxlet_dbltype =DROPLET.TYPE)
-
-
-
-# ScansnpSS
-ScansnpSS <- read.csv(SCanSNP_path, sep = "\t", header = T,stringsAsFactors=F) %>% dplyr::rename(ScansnpSSID=ID)
-ScansnpSS$ScansnpSSID[ScansnpSS$ScansnpSSID == "notclassified"] <- "unassigned"
-ScansnpSS[ScansnpSS=="Doublet"]<-"doublet"
-ScansnpSS[ScansnpSS=="Singlet"]<-"singlet"
-ScansnpSS$Quality <- ifelse((ScansnpSS$Quality != "LowQuality") & (ScansnpSS$Quality != "doublet"), "GoodQuality", ScansnpSS$Quality )
-ScansnpSS <- ScansnpSS[,c("barcode","DropletType","FirstID","SecondID","Quality")]%>% dplyr::rename(ScansnpSS_Type = DropletType, ScansnpSS_FirstID=FirstID , ScansnpSS_SecondID = SecondID, ScansnpSS_Qual = Quality )
-
-
-
-scDblFinderDF <- read.csv(scDblFinder_path, sep = "\t", header = F,stringsAsFactors=F, col.names = c("barcode","scDblFinder_type"))
-
-dropkick <- read.csv(dropkick_path, sep = "\t", header = T,stringsAsFactors=F)
-
-MultiCall <- SoCSS  %>%   dplyr::inner_join(VireoSS,  by = "barcode") %>%   dplyr::inner_join(ScansnpSS,  by = "barcode") %>% dplyr::inner_join(DemuxletSS, by = "barcode") %>%
-    dplyr::inner_join(scDblFinderDF, by = "barcode") %>%    dplyr::inner_join(dropkick, by = "barcode")
-  
-  } else {
-    
-  print("Please provide Filtered Features To create aggregated ID call")
-  }
-
-
-
-
-
-```
-
-
-
-### 10.1 __Multi call TSV Exploration__
-
-
-```{r , collapse=TRUE}
-
-if (!is.null(FilteredFeaturesPath)){
-
-DBLsPerBC <- data.frame(barcode=MultiCall$barcode)
-DBLsPerBC["DBLs_Call"] <- rowSums(MultiCall[c("SoC_status","Vireo_ID","ScansnpSS_Type","Demuxlet_dbltype")] == "doublet")
-
-
-
-#Initilize empty DFs
-Consensus <- data.frame(barcode=MultiCall$barcode)
-Consensus_min1 <- data.frame(barcode=MultiCall$barcode)
-Consensus_max2 <- data.frame(barcode=MultiCall$barcode)
-
-
-
-for (id in unique(unlist(MultiCall[c("SoC_FirstID","Vireo_best_singlet","ScansnpSS_FirstID","Demuxlet_FirstID")]))){
-
-  #Adding tool-specific score (1.5 for demuxlet/scansnp and 1 for Soc/Vireo) since in this phase we want to exploit demuxlet/scansnp sensitivity 
-  CallsPerBC <- as.data.frame(MultiCall[c("SoC_FirstID","Vireo_best_singlet","ScansnpSS_FirstID","Demuxlet_FirstID")] == id)
-  CallsPerBC["SoC_FirstID"] <- ifelse(CallsPerBC[,"SoC_FirstID"], 1, 0)
-  CallsPerBC["Vireo_best_singlet"] <- ifelse(CallsPerBC[,"Vireo_best_singlet"], 1, 0)
-  CallsPerBC["ScansnpSS_FirstID"] <- ifelse(CallsPerBC[,"ScansnpSS_FirstID"], 1.5 , 0)
-  CallsPerBC["Demuxlet_FirstID"] <- ifelse(CallsPerBC[,"Demuxlet_FirstID"], 1.5, 0)
-  
-  CallsPerBC[paste0("Calls_",id)] <- rowSums(CallsPerBC)
-  
-  Consensus[paste0("Consensus_",id)] <- as.vector(ifelse(CallsPerBC[paste0("Calls_",id)] >= 3, 1,0))
-
-
-  #CallsPerBC[paste0("Calls_",id)] <- rowSums(MultiCall[c("SoC_FirstID","Vireo_best_singlet","ScansnpSS_FirstID","Demuxlet_FirstID")] == id)
-  #Consensus[paste0("Consensus_",id)] <- as.vector(ifelse(CallsPerBC[paste0("Calls_",id)] >= 3, 1,0))
-  #Consensus_min1[paste0("Consensus_",id)] <- as.vector(ifelse(CallsPerBC[paste0("Calls_",id)] >= 3, 1,0))
-}
-
-
-
-
-#LowQuality Assignment
-
-LowQuality <- MultiCall[((MultiCall$ScansnpSS_Qual == "LowQuality") & (rowSums(Consensus[-1]) == 0)) | ((rowSums(Consensus[-1]) == 0) & (MultiCall$dropkick_label_03 == "LowQuality")),"barcode"]
-
-
-
-
-#Genetic Doublets assignment
-Genetic_DBLs <-  MultiCall[
-
-(
-
-((MultiCall$ScansnpSS_Type == "doublet") & ((MultiCall$SoC_status == "doublet") | (MultiCall$Vireo_ID == "doublet") | (MultiCall$Demuxlet_dbltype == "doublet") | (MultiCall$scDblFinder_type == "doublet") ))   |
-((MultiCall$SoC_status == "doublet") & (MultiCall$Vireo_ID == "doublet") & (MultiCall$Demuxlet_dbltype == "doublet") &  (rowSums(Consensus[-1]) == 0))
-
-)
-
-&     (! MultiCall$barcode %in% LowQuality)
-                             
-
-                          
-                           ,"barcode"]
-
-
-
-#Transcriptomic Doublets assignment
-Transcriptomic_DBLs <- MultiCall[(MultiCall$scDblFinder_type == "doublet") & (! MultiCall$barcode %in% Genetic_DBLs) & (! MultiCall$barcode %in% LowQuality),"barcode"]
-
-
-
-SafeSNGs <- MultiCall[as.vector((rowSums(Consensus[-1]) == 1) & (!MultiCall$barcode %in% LowQuality) & (!MultiCall$barcode %in% Transcriptomic_DBLs) & (!MultiCall$barcode %in% Genetic_DBLs))
-,"barcode"]
-
-
-#Finally cells not meeting consensus and not falling into previous categories
-LowQuality <- c(LowQuality, MultiCall[(!MultiCall$barcode %in% SafeSNGs) & (!MultiCall$barcode %in% LowQuality) & (!MultiCall$barcode %in% Transcriptomic_DBLs) & (!MultiCall$barcode %in% Genetic_DBLs),"barcode"])
-
-
-
-
-
-
-#DF slices prep
-SafeSNGsDF <- data.frame(barcode = SafeSNGs , Consensus = sapply(strsplit(colnames(Consensus[-1])[max.col(Consensus[Consensus$barcode %in% SafeSNGs,-1])],"_"), `[`, 2))
-doubletDF <- data.frame(barcode = unique(c(Genetic_DBLs,Transcriptomic_DBLs))  , Consensus = "doublet")
-LowQualDF <- data.frame(barcode = LowQuality , Consensus = "LowQuality")
-#RecoveredSNGsDF <- data.frame(barcode = RecoveredSNGs , Consensus = sapply(strsplit(colnames(CallsPerBC[-1])[max.col(CallsPerBC[CallsPerBC$barcode %in% RecoveredSNGs,-1])],"_"), `[`, 2))
-
-#FinalDF
-ConsensusDF <- rbind(rbind(SafeSNGsDF,doubletDF), LowQualDF)
-
-write.table(ConsensusDF,aggregatedCall, row.names = F, quote = F, sep = "\t")
-
-rownames(ConsensusDF) <- ConsensusDF$barcode
-  } else {
-    
-  print("Please provide Filtered Features To create aggregated ID call")
-  }
-
-
-
-
-```
-
-
-
-
-### 11 __Counts Plot with aggregated Call__
-
-
-
-```{r, echo = FALSE, warning  = FALSE, fig.height = 40, fig.width = 16}
-
-
-if (!is.null(FilteredFeaturesPath)){
-
-  par(mfrow=c(5,1))
-
-  sc.data <- Read10X(data.dir = FilteredFeaturesPath)
-  SeuratObject <- CreateSeuratObject(counts = sc.data)
-  rownames(mergedIDs_SoCMapped) <- mergedIDs_SoCMapped$barcode
-  SeuratObject[["SoCID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SoCID"]
-  SeuratObject[["Demuxlet_V1_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V1_BEST"]
-  SeuratObject[["VireoID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "VireoID"]
-  SeuratObject[["SCanSNPID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SCanSNPID"]
-  SeuratObject[["Demuxlet_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_BEST"]
-  SeuratObject[["scDblFinder_type"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "scDblFinder_type"]
-  SeuratObject[["dropkick_label_03"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "dropkick_label_03"]
-  SeuratObject[["AggregatedCall"]] <- ConsensusDF[rownames(SeuratObject@meta.data), "Consensus"]
-
-  SeuratObject$log_counts <- log10(SeuratObject$nCount_RNA+1)
-
-plotList <- list()
-plotList[["SoCIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "SoCID", pt.size = 0.5)+ labs(title = "Soup or Cell IDs")
-plotList[["Demuxlet_V1_BESTplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "Demuxlet_V1_BEST", pt.size = 0.5)+ labs(title = "Demuxlet_V1 IDs")
-plotList[["VireoIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "VireoID", pt.size = 0.5)+ labs(title = "Vireo IDs")
-plotList[["SCanSNPIDplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "SCanSNPID", pt.size = 0.5)+ labs(title = "SCanSNP IDs")
-plotList[["Demuxlet_BESTplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "Demuxlet_BEST", pt.size = 0.5)+ labs(title = "Demuxlet IDs")
-plotList[["scDblFinder_typeplot"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "scDblFinder_type", pt.size = 0.5)+ labs(title = "scDblFinder_type IDs")
-plotList[["dropkick"]] <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "dropkick_label_03", pt.size = 0.5)+ labs(title = "dropkick IDs")
-plotList[["AggregatedCall_plot"]]  <-  VlnPlot(SeuratObject, features = "log_counts", group.by = "AggregatedCall", pt.size = 0.5)+ labs(title = "AggregatedCall IDs")
-
-CombinePlots(plotList, ncol = 1, legend = NULL)
-
-} else {
-print("Please provide Filtered Features path for counts plot across IDs")
-}
-
-
-
-```
-
-
-
-### 12 __Plot of Cells Assignments across tools with aggregated Call__
-
-
-```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
-
-if (!is.null(FilteredFeaturesPath)){
-
-IDdf_temp<- as.data.frame(table(ConsensusDF$Consensus), stringsAsFactors = F)
-colnames(IDdf_temp) <- c("ID","Cells")
-IDdf_temp$Software <- "aggregatedCall"
-IDdf <- rbind(IDdf,IDdf_temp)
-
-
-ggplot(data=IDdf, aes(x=Software, y=Cells, fill=ID)) +
-  geom_bar(stat="identity", color="black",position=position_dodge())+
-  theme_minimal()+
-  theme(axis.text.x = element_text(size =  15,angle = 90), axis.text.y = element_text(size =  15), axis.title.y= element_text(size =  20), axis.title.x= element_text(size =  20))
-
-} else {
-print("Please provide Filtered Features path for counts plot across IDs")
-}
 
 ```
