@@ -65,7 +65,7 @@ for sample in sample_list:
 
 # common parameters
 
-_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.4.0"
+_SINGULARITY_IMAGE = "docker://testalab/demultiplexing:1.5.0"
 
 localrules: souporcell_container
 
@@ -384,7 +384,7 @@ rule scansnp:
         barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
     output:
         barcodesid = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv')
-    container: "/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
+    container: _SINGULARITY_IMAGE
     threads: 5
     resources:
         time = "24:00:00",
@@ -424,8 +424,8 @@ rule sample_report:
         vireo = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv'),
         scansnp = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv'),
     output:
-        html =  os.path.join(report_path, "{sample}" + '_demultiplexing.html'),
-    container: "/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
+        html =  os.path.join(report_path, "{sample}" + '_demultiplexing.html')
+    container: _SINGULARITY_IMAGE
     threads: 1
     resources:
         time = "6:00:00",
