@@ -619,7 +619,7 @@ for (tool in Software){
 
 
 
-accuracyPlotList[["AccuracyPerLine"]] <- ggplot(data=CorrectAssignsDF, aes(x=Software, y=CorrectAssigns, fill=Identity)) +
+accuracyPlotList[["AccuracyPerLine"]] <- ggplot(data=CorrectAssignsDF, aes(x="Software", y="CorrectAssigns", fill="Identity")) +
   geom_bar(stat="identity", position=position_dodge(0.6), width = 0.6)+
   scale_fill_brewer(palette="Paired")+
     labs(title="Accuracy Per ID")+
@@ -703,10 +703,10 @@ IDagreementRatiosDF <- as.data.frame(IDagreementRatios)
 ### 8 __scDblFinder vs genetic doublets detection__
 
 ```{r, echo = FALSE, warning  = FALSE, fig.height = 10, fig.width = 16}
-  
+
 
 if (!is.null(FilteredFeaturesPath)){
-  
+
 mergedIDs_SoCMapped_SNG <- mergedIDs_SoCMapped
 rownames(mergedIDs_SoCMapped_SNG) <- mergedIDs_SoCMapped_SNG$barcode
 mergedIDs_SoCMapped_SNG$barcode <- NULL
@@ -719,7 +719,7 @@ Combs <- as.data.frame(combn(Software, 2), stringsAsFactors = F)
 scDblCombs <- c()
 for (col in colnames(Combs)){
   if ("scDblFinder_type" %in% c(Combs[col])[[1]]) {
-    
+
     scDblCombs <-c(scDblCombs,col)
   }
 }
@@ -731,15 +731,15 @@ Combs <- Combs[scDblCombs]
 
 vennList <- list()
 for (i in colnames(Combs)){
-  
+
   Tool1 <- Combs[[i]][1]
   Tool2 <- Combs[[i]][2]
-  
+
   combName <- paste0(Tool1,"_VS_",Tool2)
-  
-  DBLsBarcodeslists <- list()  
-  DBLsBarcodeslists[[Tool1]] = rownames(mergedIDs_SoCMapped_SNG[mergedIDs_SoCMapped_SNG[Tool1] == "doublet",])
-  DBLsBarcodeslists[[Tool2]] = rownames(mergedIDs_SoCMapped_SNG[mergedIDs_SoCMapped_SNG[Tool2] == "doublet",])
+
+  DBLsBarcodeslists <- list()
+  DBLsBarcodeslists[[Tool1]] <- rownames(mergedIDs_SoCMapped_SNG[mergedIDs_SoCMapped_SNG[Tool1] == "doublet",])
+  DBLsBarcodeslists[[Tool2]] <- rownames(mergedIDs_SoCMapped_SNG[mergedIDs_SoCMapped_SNG[Tool2] == "doublet",])
 
 
   grid.newpage()
@@ -757,7 +757,7 @@ for (i in colnames(Combs)){
           # Set names
           cat.cex = 1,
           cat.fontface = "bold",
-          cat.default.pos = "outer", 
+          cat.default.pos = "outer",
           filename = NULL)
   grid.draw(venn_object)
 }
@@ -777,16 +777,16 @@ for (i in colnames(Combs)){
 ```{r , collapse=TRUE}
 
 if (is.null(BarcodeMap)){
-  DStype = "1"
+  DStype <- "1"
 } else {
-  DStype = "0"
+  DStype <- "0"
 
 }
 
 
 
 
-DSsize = dim(mergedIDs_SoCMapped)[1]
+DSsize <- dim(mergedIDs_SoCMapped)[1]
 
 MetricsDF <- data.frame(matrix(, nrow=0, ncol=5))
 colnames(MetricsDF) <- c("Software","DBLsRate","TotalDroplets","Dataset","DStype")
@@ -887,9 +887,9 @@ dropkick <- read.csv(dropkick_path, sep = "\t", header = T,stringsAsFactors=F)
 
 MultiCall <- SoCSS  %>%   dplyr::inner_join(VireoSS,  by = "barcode") %>%   dplyr::inner_join(ScansnpSS,  by = "barcode") %>% dplyr::inner_join(DemuxletSS, by = "barcode") %>%
     dplyr::inner_join(scDblFinderDF, by = "barcode") %>%    dplyr::inner_join(dropkick, by = "barcode")
-  
+
   } else {
-    
+
   print("Please provide Filtered Features To create aggregated ID call")
   }
 
@@ -922,15 +922,15 @@ Consensus_max2 <- data.frame(barcode=MultiCall$barcode)
 
 for (id in unique(unlist(MultiCall[c("SoC_FirstID","Vireo_best_singlet","ScansnpSS_FirstID","Demuxlet_FirstID")]))){
 
-  #Adding tool-specific score (1.5 for demuxlet/scansnp and 1 for Soc/Vireo) since in this phase we want to exploit demuxlet/scansnp sensitivity 
+  #Adding tool-specific score (1.5 for demuxlet/scansnp and 1 for Soc/Vireo) since in this phase we want to exploit demuxlet/scansnp sensitivity
   CallsPerBC <- as.data.frame(MultiCall[c("SoC_FirstID","Vireo_best_singlet","ScansnpSS_FirstID","Demuxlet_FirstID")] == id)
   CallsPerBC["SoC_FirstID"] <- ifelse(CallsPerBC[,"SoC_FirstID"], 1, 0)
   CallsPerBC["Vireo_best_singlet"] <- ifelse(CallsPerBC[,"Vireo_best_singlet"], 1, 0)
   CallsPerBC["ScansnpSS_FirstID"] <- ifelse(CallsPerBC[,"ScansnpSS_FirstID"], 1.5 , 0)
   CallsPerBC["Demuxlet_FirstID"] <- ifelse(CallsPerBC[,"Demuxlet_FirstID"], 1.5, 0)
-  
+
   CallsPerBC[paste0("Calls_",id)] <- rowSums(CallsPerBC)
-  
+
   Consensus[paste0("Consensus_",id)] <- as.vector(ifelse(CallsPerBC[paste0("Calls_",id)] >= 3, 1,0))
 
 
@@ -960,9 +960,9 @@ Genetic_DBLs <-  MultiCall[
 )
 
 &     (! MultiCall$barcode %in% LowQuality)
-                             
 
-                          
+
+
                            ,"barcode"]
 
 
@@ -997,7 +997,7 @@ write.table(ConsensusDF,aggregatedCall, row.names = F, quote = F, sep = "\t")
 
 rownames(ConsensusDF) <- ConsensusDF$barcode
   } else {
-    
+
   print("Please provide Filtered Features To create aggregated ID call")
   }
 
