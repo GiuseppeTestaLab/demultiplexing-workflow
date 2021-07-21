@@ -405,6 +405,8 @@ rule sample_report:
         soc = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'clusters.tsv'),
         vireo = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv'),
         scansnp = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv'),
+        dropkick = lambda wildcards: os.path.join(demultiplexing_path, wildcards.sample, 'dropkick', 'dropkick_class.tsv') if inputdata["samples"][wildcards.sample]["filteredmatrix"] else "",
+        scDblFinder = lambda wildcards: os.path.join(demultiplexing_path, wildcards.sample, 'scdblfinder', 'barcodesclass.tsv') if inputdata["samples"][wildcards.sample]["filteredmatrix"] else ""
     output:
         html =  os.path.join(report_path, "{sample}" + '_demultiplexing.html')
     container: _SINGULARITY_IMAGE
@@ -420,9 +422,7 @@ rule sample_report:
         barcode_map = lambda wildcards: inputdata['samples'][wildcards.sample]['referencecall'],
         demult_metrics = os.path.join(report_path, "{sample}", 'demultiplexing_metrics.tsv'),
         aggregatedCall = os.path.join(demultiplexing_path, "{sample}", 'aggregatedCall', 'aggregatedCall.tsv'),
-        aggregatedCalldir = os.path.join(demultiplexing_path, "{sample}", 'aggregatedCall'),
-        dropkick = os.path.join(demultiplexing_path, "{sample}", 'dropkick', 'dropkick_class.tsv') if inputdata["samples"][sample]["filteredmatrix"] is not None else None,
-        scDblFinder = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder', 'barcodesclass.tsv') if inputdata["samples"][sample]["filteredmatrix"] is not None else None
+        aggregatedCalldir = os.path.join(demultiplexing_path, "{sample}", 'aggregatedCall')
     script:
         "scripts/Demultiplexing_report.Rmd"
 
