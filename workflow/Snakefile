@@ -386,7 +386,7 @@ rule scansnp:
         conda shell.zsh hook > $TMPFILE
         set +u; source $TMPFILE; conda activate scansnp; set -u
         # run SCanSNP
-        python /hpcnfs/scratch/temporary/Dav_vc/20.4_DemultiMatteo/SCanSNP_V1_ssh_EmptyFit/SCanSNP/SCanSNP/SCanSNP.py \
+        python /usr/local/SCanSNP/SCanSNP/SCanSNP.py \
                --threads {threads} \
                --bam {input.bam} \
                --barcodes {input.barcodes} \
