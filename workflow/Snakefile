@@ -49,16 +49,14 @@ processing_path = os.path.join(config["datapath"], "scRNAseq", "tmp_" + set_id +
 sample_list = list(inputdata["samples"].keys())
 demult_files = []
 for sample in sample_list:
-    #demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v1', '{}.best'.format(sample)))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'demuxlet_v2', '{}.best'.format(sample)))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'vireo', 'vireo_out', 'donor_ids.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'souporcell', 'clusters.tsv'))
     demult_files.append(os.path.join(demultiplexing_path, sample, 'scansnp', 'Cell_IDs.tsv'))
-    demult_files.append(os.path.join(report_path, sample + '_demultiplexing.html'))
-    if inputdata["samples"][sample]["filteredmatrix"] is not None:
+    if inputdata["samples"][sample]["filteredmatrix"]:
         demult_files.append(os.path.join(demultiplexing_path, sample, 'dropkick', 'dropkick_class.tsv'))
         demult_files.append(os.path.join(demultiplexing_path, sample, 'scdblfinder', 'barcodesclass.tsv'))
-
+    demult_files.append(os.path.join(report_path, sample + '_demultiplexing.html'))
 
 ###########################################################################
 
