@@ -516,7 +516,11 @@ if (!is.null(FilteredFeaturesPath)){
   par(mfrow=c(5,1))
 
   sc.data <- Read10X(data.dir = FilteredFeaturesPath)
-  SeuratObject <- CreateSeuratObject(counts = sc.data)
+  if (is.list(sc.data)){
+    SeuratObject <- CreateSeuratObject(counts = sc.data[["Gene Expression"]])
+  } else {
+    SeuratObject <- CreateSeuratObject(counts = sc.data)
+  }
   rownames(mergedIDs_SoCMapped) <- mergedIDs_SoCMapped$barcode
   SeuratObject[["SoCID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SoCID"]
   SeuratObject[["Demuxlet_V1_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V1_BEST"]
@@ -1017,7 +1021,11 @@ if (!is.null(FilteredFeaturesPath)){
   par(mfrow=c(5,1))
 
   sc.data <- Read10X(data.dir = FilteredFeaturesPath)
-  SeuratObject <- CreateSeuratObject(counts = sc.data)
+  if (is.list(sc.data)){
+    SeuratObject <- CreateSeuratObject(counts = sc.data[["Gene Expression"]])
+  } else {
+    SeuratObject <- CreateSeuratObject(counts = sc.data)
+  }
   rownames(mergedIDs_SoCMapped) <- mergedIDs_SoCMapped$barcode
   SeuratObject[["SoCID"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "SoCID"]
   SeuratObject[["Demuxlet_V1_BEST"]] <- mergedIDs_SoCMapped[rownames(SeuratObject@meta.data), "Demuxlet_V1_BEST"]
