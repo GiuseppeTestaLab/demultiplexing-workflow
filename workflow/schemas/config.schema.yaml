@@ -50,7 +50,7 @@ definitions:
         type: array
 
       scheduler:
-        enum: [null, "pbs"]
+        enum: [null, "pbs", "slurm"]
 
       inputfile:
         type: string
