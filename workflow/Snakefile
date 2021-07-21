@@ -45,7 +45,6 @@ benchmark_path = os.path.join(config["datapath"], "scRNAseq", "benchmarks", set_
 # the following is a temporary path where intermediate BAM files are written
 processing_path = os.path.join(config["datapath"], "scRNAseq", "tmp_" + set_id + "_" + username)
 
-
 # define list of final count files
 sample_list = list(inputdata["samples"].keys())
 demult_files = []
@@ -324,58 +323,43 @@ rule souporcell:
 
 ###########################################################################
 
-
-#---Singularity container is hardcoded, need to include scDBlfinder in final image
-
 rule scDblFinder:
-	input:
-		filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'] if inputdata['samples'][wildcards.sample]['filteredmatrix'] is not None else []
-	output:
-		barcodesclass = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder', 'barcodesclass.tsv')
-	singularity:
-		"/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
-	log:
-		os.path.join(demultiplexing_path,"{sample}","scdblfinder.log")
-	resources:
-		time="2:00:00",
-		mem="4G"
-	params:
-		scDblFinderpath = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder')
-	script:
-		"scripts/scDBLfinder.R"
-
-
-
+    input:
+        filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'] if inputdata['samples'][wildcards.sample]['filteredmatrix'] is not None else []
+    output:
+        barcodesclass = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder', 'barcodesclass.tsv')
+    container: _SINGULARITY_IMAGE
+    log:
+        os.path.join(demultiplexing_path, "{sample}", "scdblfinder.log")
+    resources:
+        time="2:00:00",
+        mem="4G"
+    params:
+        scDblFinderpath = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder')
+    script:
+        "scripts/scDBLfinder.R"
 
 ###########################################################################
-
-
-#---Singularity container is hardcoded, need to include scDBlfinder in final image
 
 rule dropkick:
-	input:
-		filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'] if inputdata['samples'][wildcards.sample]['filteredmatrix'] is not None else []
-	output:
-		dropkickOut = os.path.join(demultiplexing_path, "{sample}", 'dropkick', 'dropkick_class.tsv')
-	singularity:
-		"/hpcnfs/data/GT/singularityImages/demultiplexing_image_matteo_2.sif"
-	threads: 5
-	resources:
-		time="20:00:00",
-		mem="32G"
-	log:
-		os.path.join(demultiplexing_path,"{sample}","dropkick.log")
-	params:
-		nprocs =  10,
-		dropkickpath = os.path.join(demultiplexing_path, "{sample}", 'dropkick')
-	script:
-		"scripts/dropkick.py"
-
+    input:
+        filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'] if inputdata['samples'][wildcards.sample]['filteredmatrix'] is not None else []
+    output:
+        dropkickOut = os.path.join(demultiplexing_path, "{sample}", 'dropkick', 'dropkick_class.tsv')
+    container: _SINGULARITY_IMAGE
+    threads: 5
+    resources:
+        time="20:00:00",
+        mem="32G"
+    log:
+        os.path.join(demultiplexing_path, "{sample}", "dropkick.log")
+    params:
+        nprocs =  10,
+        dropkickpath = os.path.join(demultiplexing_path, "{sample}", 'dropkick')
+    script:
+        "scripts/dropkick.py"
 
 ###########################################################################
-
-
-
 
 rule scansnp:
     input:
@@ -390,9 +374,9 @@ rule scansnp:
         time = "24:00:00",
         mem = "6G"
     log:
-        os.path.join(demultiplexing_path,"{sample}","scansnp.log")
+        os.path.join(demultiplexing_path, "{sample}", "scansnp.log")
     benchmark:
-        os.path.join(benchmark_path,"scansnp.{sample}.txt")
+        os.path.join(benchmark_path, "scansnp.{sample}.txt")
     params:
         outdir = lambda wildcards, output: os.path.dirname(output.barcodesid),
         scratch_dir = config["scratchpath"]
@@ -443,7 +427,6 @@ rule sample_report:
         scDblFinder = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder', 'barcodesclass.tsv') if inputdata["samples"][sample]["filteredmatrix"] is not None else None
     script:
         "scripts/Demultiplexing_report.Rmd"
-
 
 ###########################################################################
 
