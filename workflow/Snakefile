@@ -274,7 +274,6 @@ rule souporcell_container:
 rule souporcell:
     input:
         bam = lambda wildcards: inputdata['samples'][wildcards.sample]['bamfile'],
-        vcf = lambda wildcards: inputdata['samples'][wildcards.sample]['vcf'],
         barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes'],
         fasta = genome_file,
         sif = ancient(os.path.join(processing_path, "souporcell.sif"))
