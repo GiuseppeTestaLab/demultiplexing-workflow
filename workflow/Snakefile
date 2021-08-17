@@ -336,7 +336,7 @@ rule scDblFinder:
         os.path.join(demultiplexing_path, "{sample}", "scdblfinder.log")
     resources:
         time="2:00:00",
-        mem="4G"
+        mem="8G"
     params:
         scDblFinderpath = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder')
     script:
@@ -353,7 +353,7 @@ rule dropkick:
     threads: 5
     resources:
         time="20:00:00",
-        mem="32G"
+        mem="64G"
     log:
         os.path.join(demultiplexing_path, "{sample}", "dropkick.log")
     params:
