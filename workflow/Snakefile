@@ -279,6 +279,7 @@ rule souporcell:
         sif = ancient(os.path.join(processing_path, "souporcell.sif"))
     output:
         out = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'clusters.tsv')
+        ambient_rna = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'ambient_rna.txt')
     container: os.path.join(processing_path, "souporcell.sif")
     threads: 10
     resources:
@@ -319,6 +320,7 @@ rule souporcell:
         # move final output file to the target directory
         mkdir -p {params.outdir}
         cp $RUNDIR/clusters.tsv {output.out}
+        cp $RUNDIR/ambient_rna.txt {output.out}
 
         # remove temporary file
         rm -fr $RUNDIR $BARCODES
