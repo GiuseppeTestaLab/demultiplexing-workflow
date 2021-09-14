@@ -915,8 +915,6 @@ DBLsPerBC["DBLs_Call"] <- rowSums(MultiCall[c("SoC_status","Vireo_ID","ScansnpSS
 
 #Initilize empty DFs
 Consensus <- data.frame(barcode=MultiCall$barcode)
-Consensus_min1 <- data.frame(barcode=MultiCall$barcode)
-Consensus_max2 <- data.frame(barcode=MultiCall$barcode)
 
 
 
@@ -936,7 +934,6 @@ for (id in unique(unlist(MultiCall[c("SoC_FirstID","Vireo_best_singlet","Scansnp
 
   #CallsPerBC[paste0("Calls_",id)] <- rowSums(MultiCall[c("SoC_FirstID","Vireo_best_singlet","ScansnpSS_FirstID","Demuxlet_FirstID")] == id)
   #Consensus[paste0("Consensus_",id)] <- as.vector(ifelse(CallsPerBC[paste0("Calls_",id)] >= 3, 1,0))
-  #Consensus_min1[paste0("Consensus_",id)] <- as.vector(ifelse(CallsPerBC[paste0("Calls_",id)] >= 3, 1,0))
 }
 
 
