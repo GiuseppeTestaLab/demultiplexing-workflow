@@ -278,7 +278,7 @@ rule souporcell:
         fasta = genome_file,
         sif = ancient(os.path.join(processing_path, "souporcell.sif"))
     output:
-        out = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'clusters.tsv')
+        out = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'clusters.tsv'),
         ambient_rna = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'ambient_rna.txt')
     container: os.path.join(processing_path, "souporcell.sif")
     threads: 10
