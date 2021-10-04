@@ -320,7 +320,7 @@ rule souporcell:
         # move final output file to the target directory
         mkdir -p {params.outdir}
         cp $RUNDIR/clusters.tsv {output.out}
-        cp $RUNDIR/ambient_rna.txt {output.out}
+        cp $RUNDIR/ambient_rna.txt {output.ambient_rna}
 
         # remove temporary file
         rm -fr $RUNDIR $BARCODES
