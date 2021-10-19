@@ -411,8 +411,8 @@ rule sample_report:
         soc = os.path.join(demultiplexing_path, "{sample}", 'souporcell', 'clusters.tsv'),
         vireo = os.path.join(demultiplexing_path, "{sample}", 'vireo', 'vireo_out', 'donor_ids.tsv'),
         scansnp = os.path.join(demultiplexing_path, "{sample}", 'scansnp', 'Cell_IDs.tsv'),
-        dropkick = lambda wildcards: os.path.join(demultiplexing_path, wildcards.sample, 'dropkick', 'dropkick_class.tsv') if inputdata["samples"][wildcards.sample]["filteredmatrix"] else "",
-        scDblFinder = lambda wildcards: os.path.join(demultiplexing_path, wildcards.sample, 'scdblfinder', 'barcodesclass.tsv') if inputdata["samples"][wildcards.sample]["filteredmatrix"] else ""
+        dropkick = lambda wildcards: os.path.join(demultiplexing_path, wildcards.sample, 'dropkick', 'dropkick_class.tsv') if inputdata["samples"][wildcards.sample]["filteredmatrix"] else [],
+        scDblFinder = lambda wildcards: os.path.join(demultiplexing_path, wildcards.sample, 'scdblfinder', 'barcodesclass.tsv') if inputdata["samples"][wildcards.sample]["filteredmatrix"] else []
     output:
         html =  os.path.join(report_path, "{sample}" + '_demultiplexing.html')
     container: _SINGULARITY_IMAGE
