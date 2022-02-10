@@ -338,7 +338,7 @@ rule scDblFinder:
         os.path.join(demultiplexing_path, "{sample}", "scdblfinder.log")
     resources:
         time="2:00:00",
-        mem="8G"
+        mem="16G"
     params:
         scDblFinderpath = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder')
     script:
