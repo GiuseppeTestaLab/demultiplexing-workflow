@@ -283,7 +283,7 @@ rule souporcell:
     container: os.path.join(processing_path, "souporcell.sif")
     threads: 10
     resources:
-        time="18:00:00",
+        time="48:00:00",
         mem="32G"
     log:
         os.path.join(demultiplexing_path, "{sample}", "souporcell.log")
