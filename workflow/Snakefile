@@ -141,7 +141,7 @@ rule demuxlet_v2:
     threads: 1
     resources:
         time = "18:00:00",
-        mem = "32G"
+        mem = "48G"
     log:
         os.path.join(demultiplexing_path, "{sample}", "demuxlet_v2.log")
     benchmark:
