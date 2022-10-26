@@ -207,7 +207,11 @@ rule cellsnp:
             zcat {input.barcodes} > $TMPFILE
         fi
 
+        # create a temporary directory where to run cellSNP
+        RUNDIR=$(mktemp -d {params.scratch_dir}/$USER-XXXXXX-cellsnp)
+        
         # run cellSNP
+        cd $RUNDIR
         cellSNP -s {input.bam} \
                 -b $TMPFILE \
                 -O {params.outdir} \
