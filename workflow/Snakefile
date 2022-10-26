@@ -119,6 +119,7 @@ rule demuxlet_v1:
         # run demuxlet
         demuxlet --sam {input.bam} \
                  --vcf {input.vcf} \
+                 --tag-UMI MR \
                  --field {params.field} \
                  --out {params.outdir}/{wildcards.sample} \
                  --group-list <( cat $TMPFILE ) \
@@ -167,6 +168,7 @@ rule demuxlet_v2:
         # run demuxlet
         popscle demuxlet --sam {input.bam} \
                          --vcf {input.vcf} \
+                         --tag-UMI MR \
                          --out {params.outdir}/{wildcards.sample} \
                          --field {params.field} \
                          --group-list $TMPFILE  >& {log}
@@ -213,8 +215,9 @@ rule cellsnp:
                 -O {params.outdir} \
                 -R {input.vcf} \
                 -p {threads} \
-                --minMAF 0.1 \
-                --minCOUNT 20 >& {log}
+                --UMItag=MR \
+                --minMAF=0.1 \
+                --minCOUNT=20 >& {log}
 
         # remove temporary file
         rm $TMPFILE               
@@ -315,6 +318,7 @@ rule souporcell:
             -f {input.fasta} \
             -t {threads} \
             -o $RUNDIR \
+            --ignore True \
             -k {params.ngenotypes} >& {log}
 
         # move final output file to the target directory
