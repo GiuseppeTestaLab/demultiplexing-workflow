@@ -8,6 +8,7 @@ library(DropletUtils)
 
 
 filtered_matrix <- snakemake@input[["filtered_matrix"]]
+barcodeList <- snakemake@input[["barcodes"]]
 barcodesclass <- snakemake@output[["barcodesclass"]]
 scDblFinderpath <- snakemake@params[["scDblFinderpath"]]
 
@@ -20,6 +21,9 @@ dir.create(scDblFinderpath, showWarnings = FALSE)
 
 
 sce <- read10xCounts(filtered_matrix)
+barcodeMask <-  read.csv(barcodeList, header=FALSE)$V1
+sce <- sce[,sce$Barcode %in% barcodeMask]
+
 
 ## __3. scDBLfinder__
 
