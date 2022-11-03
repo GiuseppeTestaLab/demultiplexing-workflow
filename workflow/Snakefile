@@ -335,6 +335,7 @@ rule souporcell:
 rule scDblFinder:
     input:
         filtered_matrix = lambda wildcards: inputdata['samples'][wildcards.sample]['filteredmatrix'] if inputdata['samples'][wildcards.sample]['filteredmatrix'] is not None else []
+        barcodes = lambda wildcards: inputdata['samples'][wildcards.sample]['barcodes']
     output:
         barcodesclass = os.path.join(demultiplexing_path, "{sample}", 'scdblfinder', 'barcodesclass.tsv')
     container: _SINGULARITY_IMAGE
