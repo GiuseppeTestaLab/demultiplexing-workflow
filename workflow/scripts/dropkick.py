@@ -5,17 +5,21 @@
 import scanpy as sc; sc.set_figure_params(color_map="viridis", frameon=False)
 import dropkick as dk
 import os
+import pandas as pd
+
 
 if not os.path.exists(snakemake.params[1]):
 	os.mkdir(snakemake.params[1])
 
 print(snakemake.params[1])
 print(snakemake.input[0])
+print(snakemake.input[1])
 print(snakemake.params[0])
 
 
-
+barcodeMask = pd.read_csv(snakemake.input[1], header=None).iloc[:,0].to_list()
 adata = sc.read_10x_mtx(snakemake.input[0])
+adata =  adata[barcodeMask]
 
 adata.var_names_make_unique()
 
