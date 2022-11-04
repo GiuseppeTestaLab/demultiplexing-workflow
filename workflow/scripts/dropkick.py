@@ -17,7 +17,7 @@ print(snakemake.input[1])
 print(snakemake.params[0])
 
 
-barcodeMask = pd.read_csv(snakemake.input[1]).iloc[:,0].to_list()
+barcodeMask = pd.read_csv(snakemake.input[1], header=None).iloc[:,0].to_list()
 adata = sc.read_10x_mtx(snakemake.input[0])
 adata =  adata[barcodeMask]
 
