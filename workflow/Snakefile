@@ -383,7 +383,7 @@ rule scansnp:
     threads: 5
     resources:
         time = "24:00:00",
-        mem = "6G"
+        mem = "16G"
     log:
         os.path.join(demultiplexing_path, "{sample}", "scansnp.log")
     benchmark:
