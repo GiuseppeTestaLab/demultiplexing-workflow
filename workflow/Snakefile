@@ -29,7 +29,7 @@ with open(config["inputfile"]) as f:
 
 # define the reference files and dir, by extracting the information from the config file
 reference_label = inputdata["ref"]
-genome_file = config["reference_files"][reference_label]["genome"]
+genome_file = os.path.expandvars(config["reference_files"][reference_label]["genome"])
 
 # get the username and possibly map it using the dictionary in config.yaml file
 username = getpass.getuser()
@@ -39,11 +39,11 @@ if username in config["userid_map"]:
 # define directory where results will be stored... paths have the following structure:
 # {datapath}/SNPcall/{type of data}/{project}-{reference}/{user}
 set_id = "{0}-{1}".format(inputdata["project"], reference_label)
-demultiplexing_path = os.path.join(config["datapath"],"scRNAseq", "demultiplexing", set_id, username)
-report_path = os.path.join(config["datapath"], "scRNAseq", "reports", set_id, username)
-benchmark_path = os.path.join(config["datapath"], "scRNAseq", "benchmarks", set_id, username)
+demultiplexing_path = os.path.expandvars(os.path.join(config["datapath"],"scRNAseq", "demultiplexing", set_id, username))
+report_path = os.path.expandvars(os.path.join(config["datapath"], "scRNAseq", "reports", set_id, username))
+benchmark_path = os.path.expandvars(os.path.join(config["datapath"], "scRNAseq", "benchmarks", set_id, username))
 # the following is a temporary path where intermediate BAM files are written
-processing_path = os.path.join(config["temporarypath"], "scRNAseq", "tmp_" + set_id + "_" + username)
+processing_path = os.path.expandvars(os.path.join(config["temporarypath"], "scRNAseq", "tmp_" + set_id + "_" + username))
 
 # define list of final count files
 sample_list = list(inputdata["samples"].keys())
